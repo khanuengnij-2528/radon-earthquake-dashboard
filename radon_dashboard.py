@@ -32,7 +32,11 @@ st.markdown("""
 <style>
   /* Dark Navy background */
   .stApp { background-color: #0a0f1e; color: #e6edf3; }
-  [data-testid="stSidebar"] { background-color: #0d1530; border-right: 1px solid #1e2d5a; }
+  [data-testid="stSidebar"] { background-color: #0d1530; border-right: 1px solid #1e2d5a; color: #e6edf3 !important; }
+  [data-testid="stSidebar"] * { color: #e6edf3 !important; }
+  [data-testid="stSidebar"] label { color: #e6edf3 !important; }
+  [data-testid="stSidebar"] p { color: #e6edf3 !important; }
+  [data-testid="stSidebar"] span { color: #e6edf3 !important; }
   .block-container { padding-top: 1rem; padding-bottom: 1rem; }
 
   /* Metric cards */
