@@ -290,7 +290,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**📍 Station Info**")
-    st.markdown("Lat: `18.795°N`  Lon: `98.953°E`")
+    st.markdown("<span style='color:#e6edf3'>Lat: <b>18.795°N</b> &nbsp; Lon: <b>98.953°E</b></span>", unsafe_allow_html=True)
     st.markdown("Location: Chiang Mai, TH")
 
 # ─── Load data ───────────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ with st.spinner("🔄 กำลังดึงข้อมูลจาก Google
 data_ok   = len(radon_full) > 100 and len(eq_full) > 10
 src_label = "🟢 Live Data" if data_ok else "🟡 Mock Data (fallback)"
 st.sidebar.markdown(f"**Data source:** {src_label}")
-st.sidebar.markdown(f"Radon: `{len(radon_full):,}` rows | EQ: `{len(eq_full):,}` rows")
+st.sidebar.markdown(f"<span style='color:#e6edf3'>Radon: <b>{len(radon_full):,}</b> rows | EQ: <b>{len(eq_full):,}</b> rows</span>", unsafe_allow_html=True)
 
 # Filter by date range
 radon = radon_full.loc[start_date:end_date].copy()
