@@ -37,6 +37,13 @@ st.markdown("""
   [data-testid="stSidebar"] label { color: #e6edf3 !important; }
   [data-testid="stSidebar"] p { color: #e6edf3 !important; }
   [data-testid="stSidebar"] span { color: #e6edf3 !important; }
+  [data-testid="stSidebar"] input { color: #e6edf3 !important; background-color: #1e2d5a !important; }
+  [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { color: #e6edf3 !important; }
+  /* Download buttons */
+  [data-testid="stDownloadButton"] button { color: #e6edf3 !important; background-color: #1e2d5a !important; border: 1px solid #388bfd !important; }
+  [data-testid="stDownloadButton"] button:hover { background-color: #388bfd !important; }
+  /* Legend text */
+  .legend text { fill: #e6edf3 !important; }
   .block-container { padding-top: 1rem; padding-bottom: 1rem; }
 
   /* Metric cards */
