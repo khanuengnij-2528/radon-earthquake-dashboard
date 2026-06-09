@@ -30,9 +30,9 @@ st.set_page_config(
 # ─── CSS Theme ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  /* Dark background */
-  .stApp { background-color: #0d1117; color: #e6edf3; }
-  [data-testid="stSidebar"] { background-color: #161b22; border-right: 1px solid #30363d; }
+  /* Dark Navy background */
+  .stApp { background-color: #0a0f1e; color: #e6edf3; }
+  [data-testid="stSidebar"] { background-color: #0d1530; border-right: 1px solid #1e2d5a; }
   .block-container { padding-top: 1rem; padding-bottom: 1rem; }
 
   /* Metric cards */
@@ -233,14 +233,14 @@ def risk_level(h):
     return "LOW"
 
 RISK_COLOR = {"LOW":"#3fb950","MODERATE":"#e3b341","HIGH":"#f0883e","VERY HIGH":"#ff7b72"}
-PLOT_BG    = "#0d1117"
-GRID_COLOR = "#21262d"
+PLOT_BG    = "#0a0f1e"
+GRID_COLOR = "#1e2d5a"
 FONT_COLOR = "#e6edf3"
 
 def dark_layout(fig, title="", height=380):
     fig.update_layout(
         title=dict(text=title, font=dict(color=FONT_COLOR, size=13), x=0.01),
-        paper_bgcolor=PLOT_BG, plot_bgcolor="#0d1117",
+        paper_bgcolor=PLOT_BG, plot_bgcolor="#0a0f1e",
         font=dict(color=FONT_COLOR, family="Inter, sans-serif"),
         height=height, margin=dict(l=50,r=20,t=40,b=40),
         legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#30363d",
