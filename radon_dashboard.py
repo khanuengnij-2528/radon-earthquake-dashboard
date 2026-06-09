@@ -535,11 +535,12 @@ with col4:
             ci = kmf.confidence_interval_
             lo = ci.iloc[:,0].values
             hi = ci.iloc[:,1].values
+            r,g,b = tuple(int(color.lstrip('#')[i:i+2],16) for i in (0,2,4))
             fig4.add_trace(go.Scatter(
                 x=list(t_)+list(t_[::-1]), y=list(hi)+list(lo[::-1]),
-                fill="toself", fillcolor=color.replace("#","rgba(")+"40)" if color.startswith("#") else color,
-                line=dict(width=0), showlegend=False, hoverinfo="skip",
-                fillcolor=f"rgba{tuple(int(color.lstrip('#')[i:i+2],16) for i in (0,2,4))+(0.15,)}"
+                fill="toself",
+                fillcolor=f"rgba({r},{g},{b},0.15)",
+                line=dict(width=0), showlegend=False, hoverinfo="skip"
             ))
             fig4.add_trace(go.Scatter(
                 x=t_, y=s_, mode="lines", name=label,
