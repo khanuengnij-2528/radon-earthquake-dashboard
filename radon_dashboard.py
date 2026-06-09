@@ -428,9 +428,7 @@ with col_map:
             size=eq_map["mag_size"].clip(3,25).tolist(),
             color=eq_map["Magnitude"].tolist(),
             colorscale=[[0,"#3fb950"],[0.4,"#e3b341"],[0.7,"#f0883e"],[1,"#ff7b72"]],
-            colorbar=dict(title="Mag", thickness=10, len=0.6,
-                         tickfont=dict(color=FONT_COLOR),
-                         titlefont=dict(color=FONT_COLOR)),
+            colorbar=dict(title="Mag", thickness=10, len=0.6),
             opacity=0.75, line=dict(width=0)
         ),
         text=eq_map["label"].tolist(), hoverinfo="text", name="Earthquakes"
