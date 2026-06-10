@@ -30,20 +30,22 @@ st.set_page_config(
 # ─── CSS Theme ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  /* Dark Navy background */
-  .stApp { background-color: #0a0f1e; color: #e6edf3; }
-  [data-testid="stSidebar"] { background-color: #0d1530; border-right: 1px solid #1e2d5a; color: #e6edf3 !important; }
-  [data-testid="stSidebar"] * { color: #e6edf3 !important; }
-  [data-testid="stSidebar"] label { color: #e6edf3 !important; }
-  [data-testid="stSidebar"] p { color: #e6edf3 !important; }
-  [data-testid="stSidebar"] span { color: #e6edf3 !important; }
-  [data-testid="stSidebar"] input { color: #e6edf3 !important; background-color: #1e2d5a !important; }
-  [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { color: #e6edf3 !important; }
+  /* Cream Theme */
+  .stApp { background-color: #fdf6ec; color: #2c2c2c; }
+  [data-testid="stSidebar"] { background-color: #f5ead8; border-right: 1px solid #d4b896; color: #2c2c2c !important; }
+  [data-testid="stSidebar"] * { color: #2c2c2c !important; }
+  [data-testid="stSidebar"] label { color: #2c2c2c !important; }
+  [data-testid="stSidebar"] p { color: #2c2c2c !important; }
+  [data-testid="stSidebar"] span { color: #2c2c2c !important; }
+  [data-testid="stSidebar"] input { color: #2c2c2c !important; background-color: #fff8f0 !important; border: 1px solid #d4b896 !important; }
+  [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { color: #2c2c2c !important; }
   /* Download buttons */
-  [data-testid="stDownloadButton"] button { color: #e6edf3 !important; background-color: #1e2d5a !important; border: 1px solid #388bfd !important; }
-  [data-testid="stDownloadButton"] button:hover { background-color: #388bfd !important; }
-  /* Legend text */
-  .legend text { fill: #e6edf3 !important; }
+  [data-testid="stDownloadButton"] button { color: #fff8f0 !important; background-color: #a0522d !important; border: 1px solid #a0522d !important; }
+  [data-testid="stDownloadButton"] button:hover { background-color: #8b4513 !important; }
+  /* Metric cards */
+  div[data-testid="stMetric"] { background:#fff8f0; border:1px solid #d4b896; border-radius:10px; padding:12px; }
+  div[data-testid="stMetric"] label { color:#7a5c3a !important; font-size:0.72rem !important; }
+  div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size:1.6rem !important; color:#2c2c2c !important; }
   .block-container { padding-top: 1rem; padding-bottom: 1rem; }
 
   /* Metric cards */
@@ -244,14 +246,14 @@ def risk_level(h):
     return "LOW"
 
 RISK_COLOR = {"LOW":"#3fb950","MODERATE":"#e3b341","HIGH":"#f0883e","VERY HIGH":"#ff7b72"}
-PLOT_BG    = "#0a0f1e"
-GRID_COLOR = "#1e2d5a"
-FONT_COLOR = "#e6edf3"
+PLOT_BG    = "#fdf6ec"
+GRID_COLOR = "#d4b896"
+FONT_COLOR = "#2c2c2c"
 
 def dark_layout(fig, title="", height=380):
     fig.update_layout(
         title=dict(text=title, font=dict(color=FONT_COLOR, size=13), x=0.01),
-        paper_bgcolor=PLOT_BG, plot_bgcolor="#0a0f1e",
+        paper_bgcolor=PLOT_BG, plot_bgcolor="#fdf6ec",
         font=dict(color=FONT_COLOR, family="Inter, sans-serif"),
         height=height, margin=dict(l=50,r=20,t=40,b=40),
         legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#30363d",
