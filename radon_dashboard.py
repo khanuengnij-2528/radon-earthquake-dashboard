@@ -272,14 +272,14 @@ with st.sidebar:
     st.markdown("---")
 
     _today = datetime.today().date()
-    _start_default = datetime(2025,1,23).date()
+    _start_default = datetime(2026,1,23).date()
     date_range = st.date_input(
         "📅 Date Range",
         value=(_start_default, _today),
         min_value=datetime(2025,1,1).date(),
         max_value=_today
     )
-    start_date = pd.to_datetime(date_range[0]) if len(date_range)==2 else pd.to_datetime("2025-01-23")
+    start_date = pd.to_datetime(date_range[0]) if len(date_range)==2 else pd.to_datetime("2026-01-23")
     end_date   = pd.to_datetime(date_range[1]) if len(date_range)==2 else pd.to_datetime(_today)
 
     mag_threshold = st.select_slider(
@@ -614,17 +614,17 @@ with col5b:
     peak_d   = int(haz_df.loc[haz_df["hazard"].idxmax(),"day"]) if haz_df["hazard"].notna().any() else 0
 
     report_html = f"""
-    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;font-size:0.82rem;">
-      <div style="margin-bottom:8px;"><span style="color:#8b949e;">Anchor date</span><br>
-        <b>{anchor.strftime('%Y-%m-%d')}</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#8b949e;">Latest radon anomaly</span><br>
-        <b style="color:#58a6ff;">{latest_radon:.2f} pCi/L</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#8b949e;">Baseline hazard</span><br>
-        <b>{baseline_safe:.5f}</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#8b949e;">Peak hazard</span><br>
-        <b style="color:#f0883e;">{peak_haz:.4f}</b> on Day {peak_d}</div>
-      <div style="margin-bottom:8px;"><span style="color:#8b949e;">High-risk days</span><br>
-        <b style="color:#ff7b72;">{n_high}</b> / {days_ahead} days</div>
+    <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:10px;padding:14px;font-size:0.82rem;color:#2c2c2c;">
+      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Anchor date</span><br>
+        <b style="color:#2c2c2c;">{anchor.strftime('%Y-%m-%d')}</b></div>
+      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Latest radon anomaly</span><br>
+        <b style="color:#1a6fbf;">{latest_radon:.2f} pCi/L</b></div>
+      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Baseline hazard</span><br>
+        <b style="color:#2c2c2c;">{baseline_safe:.5f}</b></div>
+      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Peak hazard</span><br>
+        <b style="color:#c05000;">{peak_haz:.4f}</b> <span style="color:#2c2c2c;">on Day {peak_d}</span></div>
+      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">High-risk days</span><br>
+        <b style="color:#c0392b;">{n_high}</b> <span style="color:#2c2c2c;">/ {days_ahead} days</span></div>
     </div>
     """
     st.markdown(report_html, unsafe_allow_html=True)
