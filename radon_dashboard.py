@@ -268,14 +268,16 @@ with st.sidebar:
     st.markdown("### 🔬 Dashboard Controls")
     st.markdown("---")
 
+    _today = datetime.today().date()
+    _start_default = datetime(2025,1,23).date()
     date_range = st.date_input(
         "📅 Date Range",
-        value=(datetime(2025,1,23), datetime(2026,5,17)),
-        min_value=datetime(2025,1,1),
-        max_value=datetime(2026,6,1)
+        value=(_start_default, _today),
+        min_value=datetime(2025,1,1).date(),
+        max_value=_today
     )
     start_date = pd.to_datetime(date_range[0]) if len(date_range)==2 else pd.to_datetime("2025-01-23")
-    end_date   = pd.to_datetime(date_range[1]) if len(date_range)==2 else pd.to_datetime("2026-05-17")
+    end_date   = pd.to_datetime(date_range[1]) if len(date_range)==2 else pd.to_datetime(_today)
 
     mag_threshold = st.select_slider(
         "⚡ Magnitude Threshold (Forecast)",
