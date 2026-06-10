@@ -145,6 +145,7 @@ def load_radon_data():
         df = df.dropna(subset=[TIME_COL]).set_index(TIME_COL).sort_index()
 
         radon = pd.to_numeric(df[RADON_COL], errors="coerce").replace(0, np.nan)
+        radon = radon[radon <= 100]  # กรองค่าผิดปกติเกิน 100 pCi/L ออก
         return radon
 
     except Exception as e:
