@@ -725,6 +725,13 @@ fig_lag.update_layout(xaxis_title="Lag (days)", yaxis_title="Pearson r",
                       yaxis=dict(range=[-0.3,0.3]))
 st.plotly_chart(fig_lag, use_container_width=True)
 
+# ─── Visit Counter ───────────────────────────────────────────────────────────
+if "visit_count" not in st.session_state:
+    st.session_state.visit_count = 0
+if "counted" not in st.session_state:
+    st.session_state.visit_count += 1
+    st.session_state.counted = True
+
 # ─── Footer ──────────────────────────────────────────────────────────────────
 st.markdown("---")
 fcol1, fcol2, fcol3 = st.columns(3)
@@ -739,10 +746,32 @@ with fcol2:
                        haz_df.to_csv(index=False),
                        "hazard_forecast.csv", "text/csv")
 with fcol3:
-    st.markdown(f"<div style='color:#8b949e;font-size:0.75rem;padding-top:8px;'>"
+    st.markdown(f"<div style='color:#7a5c3a;font-size:0.75rem;padding-top:8px;'>"
                 f"Data: {start_date.date()} → {end_date.date()}<br>"
                 f"Anomalies: {len(radon_anom)} | EQ nearby: {len(eq_near)}</div>",
                 unsafe_allow_html=True)
+
+# ─── Visit Counter + Copyright Bar ───────────────────────────────────────────
+st.markdown(f"""
+<div style="background:#f5ead8;border:1px solid #d4b896;border-radius:10px;
+            padding:14px 24px;margin-top:16px;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+  <div style="font-size:0.82rem;color:#2c2c2c;">
+    👁️ <b>ผู้เข้าชม session นี้:</b>
+    <span style="color:#a0522d;font-size:1.1rem;font-weight:700;">
+      {st.session_state.visit_count:,}
+    </span> ครั้ง
+  </div>
+  <div style="font-size:0.78rem;color:#7a5c3a;text-align:center;">
+    🔬 <b>iRES-MCM Radon & Earthquake Hazard Dashboard</b><br>
+    สถานีตรวจวัดเรดอน มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน
+  </div>
+  <div style="font-size:0.75rem;color:#7a5c3a;text-align:right;">
+    📅 เริ่มพัฒนา: <b>มกราคม 2568</b><br>
+    © 2568 สงวนลิขสิทธิ์ ห้ามคัดลอกโดยไม่ได้รับอนุญาต
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ─── Real-time auto-refresh ───────────────────────────────────────────────────
 if realtime:
