@@ -463,22 +463,16 @@ with col_map:
     fig_map.update_geos(
         center=dict(lat=station[0], lon=station[1]),
         projection_scale=4,
-        showland=True, landcolor="#d4c5a9",
-        showocean=True, oceancolor="#a8d0e6",
-        showlakes=True, lakecolor="#a8d0e6",
-        showrivers=True, rivercolor="#7ab8d4",
-        showcoastlines=True, coastlinecolor="#8b7355",
-        showframe=False, showcountries=True, countrycolor="#8b7355",
-        showsubunits=True, subunitcolor="#c4a882",
-        bgcolor="#fdf6ec",
-        lataxis_range=[station[0]-9, station[0]+9],
-        lonaxis_range=[station[1]-9, station[1]+9],
+        showland=True, landcolor="#1c2230",
+        showocean=True, oceancolor="#0d1117",
+        showcoastlines=True, coastlinecolor="#30363d",
+        showframe=False, showcountries=True, countrycolor="#30363d",
+        bgcolor=PLOT_BG
     )
     fig_map.update_layout(
-        paper_bgcolor="#fdf6ec", font=dict(color=FONT_COLOR),
-        height=420, margin=dict(l=0,r=0,t=30,b=0),
-        legend=dict(bgcolor="rgba(255,248,240,0.8)", font=dict(size=10),
-                    bordercolor="#d4b896", borderwidth=1),
+        paper_bgcolor=PLOT_BG, font=dict(color=FONT_COLOR),
+        height=380, margin=dict(l=0,r=0,t=30,b=0),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
         title=dict(text=f"EQ locations within {radius_km} km (N={len(eq_near)})",
                    font=dict(color=FONT_COLOR, size=12), x=0.01)
     )
