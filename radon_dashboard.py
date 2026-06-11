@@ -346,7 +346,9 @@ dt_4_5 = dt_df.loc[(E4==1)&(E5==0),"dt_M40"].dropna()
 dt_5up = dt_df.loc[E5==1,"dt_M50"].dropna()
 
 # Hazard (for selected mag threshold)
-key = str(mag_threshold).replace(".","")
+# snap mag_threshold ให้ตรงกับ min_mag_list ที่มีอยู่
+_snap = min(min_mag_list, key=lambda x: abs(x - mag_threshold))
+key = str(_snap).replace(".","")
 T_sel = dt_df[f"dt_M{key}"]; E_sel = dt_df[f"ev_M{key}"]
 haz_df = piecewise_hazard(T_sel.values, E_sel.values, max_day=days_ahead)
 tail_start = max(1, int(days_ahead*0.7))
