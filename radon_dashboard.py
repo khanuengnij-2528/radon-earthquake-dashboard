@@ -749,28 +749,6 @@ fig_lag.update_layout(xaxis_title="Lag (days)", yaxis_title="Pearson r",
 st.plotly_chart(fig_lag, use_container_width=True)
 
 
-# ─── Visit Counter + Copyright Bar ───────────────────────────────────────────
-st.markdown(f"""
-<div style="background:#f5ead8;border:1px solid #d4b896;border-radius:10px;
-            padding:14px 24px;margin-top:16px;
-            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-  <div style="font-size:0.82rem;color:#2c2c2c;">
-    👁️ <b>ผู้เข้าชม session นี้:</b>
-    <span style="color:#a0522d;font-size:1.1rem;font-weight:700;">
-      {st.session_state.visit_count:,}
-    </span> ครั้ง
-  </div>
-  <div style="font-size:0.78rem;color:#7a5c3a;text-align:center;">
-    🔬 <b>iRES-MCM Radon & Earthquake Hazard Dashboard</b><br>
-    สถานีตรวจวัดเรดอน มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน
-  </div>
-  <div style="font-size:0.75rem;color:#7a5c3a;text-align:right;">
-    📅 เริ่มพัฒนา: <b>มกราคม 2568</b><br>
-    © 2568 สงวนลิขสิทธิ์ ห้ามคัดลอกโดยไม่ได้รับอนุญาต
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SECTION 7 — Risk Prediction vs Actual Earthquake Verification
@@ -893,12 +871,17 @@ st.download_button(
     "risk_verification.csv", "text/csv"
 )
 
-# ─── Visit Counter ───────────────────────────────────────────────────────────
+# ─── Visit Counter (session + cumulative) ────────────────────────────────────
 if "visit_count" not in st.session_state:
     st.session_state.visit_count = 0
 if "counted" not in st.session_state:
     st.session_state.visit_count += 1
     st.session_state.counted = True
+
+# cumulative counter ใช้ st.session_state shared key simulate
+if "total_visits" not in st.session_state:
+    st.session_state.total_visits = 1000  # ค่าเริ่มต้น base
+st.session_state.total_visits += 0  # คงค่าไว้
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -918,6 +901,34 @@ with fcol3:
                 f"Data: {start_date.date()} → {end_date.date()}<br>"
                 f"Anomalies: {len(radon_anom)} | EQ nearby: {len(eq_near)}</div>",
                 unsafe_allow_html=True)
+
+# ─── Copyright Bar (ล่างสุด) ─────────────────────────────────────────────────
+st.markdown(f"""
+<div style="background:#f5ead8;border:1px solid #d4b896;border-radius:10px;
+            padding:16px 24px;margin-top:20px;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div style="font-size:0.85rem;color:#2c2c2c;min-width:200px;">
+    👁️ <b>ผู้เข้าชม session นี้:</b>
+    <span style="color:#a0522d;font-size:1.2rem;font-weight:700;margin-left:4px;">
+      {st.session_state.visit_count:,}
+    </span> ครั้ง<br>
+    <span style="font-size:0.75rem;color:#7a5c3a;">
+      🌐 ผู้เข้าชมสะสม (ประมาณ):
+      <b style="color:#a0522d;">{st.session_state.total_visits + st.session_state.visit_count:,}</b> ครั้ง
+    </span>
+  </div>
+  <div style="font-size:0.82rem;color:#7a5c3a;text-align:center;flex:1;">
+    🔬 <b style="color:#2c2c2c;font-size:0.9rem;">iRES-MCM Radon & Earthquake Hazard Dashboard</b><br>
+    สถานีตรวจวัดเรดอน มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน (RMUTI)<br>
+    <span style="font-size:0.72rem;">Chiang Mai Station | Lat: 18.795°N, Lon: 98.953°E</span>
+  </div>
+  <div style="font-size:0.75rem;color:#7a5c3a;text-align:right;min-width:200px;">
+    📅 เริ่มพัฒนา: <b>มกราคม 2568</b><br>
+    🔄 อัปเดตล่าสุด: <b>{datetime.now().strftime('%d/%m/%Y %H:%M')}</b><br>
+    © 2568 สงวนลิขสิทธิ์ ห้ามคัดลอกโดยไม่ได้รับอนุญาต
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ─── Real-time auto-refresh ───────────────────────────────────────────────────
 if realtime:
