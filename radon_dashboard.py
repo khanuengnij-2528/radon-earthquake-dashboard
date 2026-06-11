@@ -748,31 +748,6 @@ fig_lag.update_layout(xaxis_title="Lag (days)", yaxis_title="Pearson r",
                       yaxis=dict(range=[-0.3,0.3]))
 st.plotly_chart(fig_lag, use_container_width=True)
 
-# ─── Visit Counter ───────────────────────────────────────────────────────────
-if "visit_count" not in st.session_state:
-    st.session_state.visit_count = 0
-if "counted" not in st.session_state:
-    st.session_state.visit_count += 1
-    st.session_state.counted = True
-
-# ─── Footer ──────────────────────────────────────────────────────────────────
-st.markdown("---")
-fcol1, fcol2, fcol3 = st.columns(3)
-with fcol1:
-    csv_radon = radon_anom.reset_index()
-    csv_radon.columns = ["Timestamp","pCi/L"]
-    st.download_button("⬇️ Download Anomalies CSV",
-                       csv_radon.to_csv(index=False),
-                       "radon_anomalies.csv", "text/csv")
-with fcol2:
-    st.download_button("⬇️ Download Forecast CSV",
-                       haz_df.to_csv(index=False),
-                       "hazard_forecast.csv", "text/csv")
-with fcol3:
-    st.markdown(f"<div style='color:#7a5c3a;font-size:0.75rem;padding-top:8px;'>"
-                f"Data: {start_date.date()} → {end_date.date()}<br>"
-                f"Anomalies: {len(radon_anom)} | EQ nearby: {len(eq_near)}</div>",
-                unsafe_allow_html=True)
 
 # ─── Visit Counter + Copyright Bar ───────────────────────────────────────────
 st.markdown(f"""
@@ -902,8 +877,12 @@ def color_match(val):
     if "✅" in str(val): return "color: #2e8b57; font-weight: bold"
     return "color: #c0392b; font-weight: bold"
 
-styled = verify_df.style    .applymap(color_risk, subset=["Risk Level"])    .applymap(color_match, subset=["EQ จริงไหม"])    .format({"Peak Hazard": "{:.4f}", "Radon (pCi/L)": "{:.2f}"})    .set_properties(**{"background-color": "#fff8f0", "color": "#2c2c2c",
-                       "border": "1px solid #d4b896"})
+try:
+    styled = verify_df.style        .map(color_risk, subset=["Risk Level"])        .map(color_match, subset=["EQ จริงไหม"])        .format({"Peak Hazard": "{:.4f}", "Radon (pCi/L)": "{:.2f}"})        .set_properties(**{"background-color": "#fff8f0", "color": "#2c2c2c",
+                           "border": "1px solid #d4b896"})
+except AttributeError:
+    styled = verify_df.style        .applymap(color_risk, subset=["Risk Level"])        .applymap(color_match, subset=["EQ จริงไหม"])        .format({"Peak Hazard": "{:.4f}", "Radon (pCi/L)": "{:.2f}"})        .set_properties(**{"background-color": "#fff8f0", "color": "#2c2c2c",
+                           "border": "1px solid #d4b896"})
 
 st.dataframe(styled, use_container_width=True, height=400)
 
@@ -913,6 +892,32 @@ st.download_button(
     verify_df.to_csv(index=False),
     "risk_verification.csv", "text/csv"
 )
+
+# ─── Visit Counter ───────────────────────────────────────────────────────────
+if "visit_count" not in st.session_state:
+    st.session_state.visit_count = 0
+if "counted" not in st.session_state:
+    st.session_state.visit_count += 1
+    st.session_state.counted = True
+
+# ─── Footer ──────────────────────────────────────────────────────────────────
+st.markdown("---")
+fcol1, fcol2, fcol3 = st.columns(3)
+with fcol1:
+    csv_radon = radon_anom.reset_index()
+    csv_radon.columns = ["Timestamp","pCi/L"]
+    st.download_button("⬇️ Download Anomalies CSV",
+                       csv_radon.to_csv(index=False),
+                       "radon_anomalies.csv", "text/csv")
+with fcol2:
+    st.download_button("⬇️ Download Forecast CSV",
+                       haz_df.to_csv(index=False),
+                       "hazard_forecast.csv", "text/csv")
+with fcol3:
+    st.markdown(f"<div style='color:#7a5c3a;font-size:0.75rem;padding-top:8px;'>"
+                f"Data: {start_date.date()} → {end_date.date()}<br>"
+                f"Anomalies: {len(radon_anom)} | EQ nearby: {len(eq_near)}</div>",
+                unsafe_allow_html=True)
 
 # ─── Real-time auto-refresh ───────────────────────────────────────────────────
 if realtime:
