@@ -282,9 +282,9 @@ with st.sidebar:
     start_date = pd.to_datetime(date_range[0]) if len(date_range)==2 else pd.to_datetime("2026-01-23")
     end_date   = pd.to_datetime(date_range[1]) if len(date_range)==2 else pd.to_datetime(_today)
 
-    mag_threshold = st.select_slider(
+    mag_threshold = st.slider(
         "⚡ Magnitude Threshold (Forecast)",
-        options=[3.0, 4.0, 5.0], value=4.0
+        min_value=1.0, max_value=10.0, value=4.0, step=0.5
     )
     radius_km = st.slider("📡 Radius (km)", 100, 1000, 1000, step=100)
     days_ahead = st.slider("📆 Forecast Window (days)", 7, 60, 30)
@@ -461,16 +461,22 @@ with col_map:
     fig_map.update_geos(
         center=dict(lat=station[0], lon=station[1]),
         projection_scale=4,
-        showland=True, landcolor="#1c2230",
-        showocean=True, oceancolor="#0d1117",
-        showcoastlines=True, coastlinecolor="#30363d",
-        showframe=False, showcountries=True, countrycolor="#30363d",
-        bgcolor=PLOT_BG
+        showland=True, landcolor="#d4c5a9",
+        showocean=True, oceancolor="#a8d0e6",
+        showlakes=True, lakecolor="#a8d0e6",
+        showrivers=True, rivercolor="#7ab8d4",
+        showcoastlines=True, coastlinecolor="#8b7355",
+        showframe=False, showcountries=True, countrycolor="#8b7355",
+        showsubunits=True, subunitcolor="#c4a882",
+        bgcolor="#fdf6ec",
+        lataxis_range=[station[0]-9, station[0]+9],
+        lonaxis_range=[station[1]-9, station[1]+9],
     )
     fig_map.update_layout(
-        paper_bgcolor=PLOT_BG, font=dict(color=FONT_COLOR),
-        height=380, margin=dict(l=0,r=0,t=30,b=0),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+        paper_bgcolor="#fdf6ec", font=dict(color=FONT_COLOR),
+        height=420, margin=dict(l=0,r=0,t=30,b=0),
+        legend=dict(bgcolor="rgba(255,248,240,0.8)", font=dict(size=10),
+                    bordercolor="#d4b896", borderwidth=1),
         title=dict(text=f"EQ locations within {radius_km} km (N={len(eq_near)})",
                    font=dict(color=FONT_COLOR, size=12), x=0.01)
     )
@@ -478,20 +484,41 @@ with col_map:
 
 with col_eq_stats:
     st.markdown("**📊 EQ Stats**")
-    for m, color in [(3.0,"#3fb950"),(4.0,"#e3b341"),(5.0,"#f0883e"),(6.0,"#ff7b72")]:
+    for m, color in [(3.0,"#2e8b57"),(4.0,"#c8860a"),(5.0,"#c05000"),(6.0,"#c0392b")]:
         cnt = int((eq_near["Magnitude"]>=m).sum())
         st.markdown(f"""
-        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+        <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:8px;
                     padding:10px;margin-bottom:8px;text-align:center;">
           <div style="font-size:1.4rem;font-weight:700;color:{color};">{cnt}</div>
           <div style="font-size:0.72rem;color:#8b949e;">M ≥ {m}</div>
         </div>""", unsafe_allow_html=True)
     max_mag = eq_near["Magnitude"].max() if len(eq_near) else 0
     st.markdown(f"""
-    <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+    <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:8px;
                 padding:10px;margin-bottom:8px;text-align:center;">
-      <div style="font-size:1.4rem;font-weight:700;color:#ff7b72;">{max_mag:.1f}</div>
-      <div style="font-size:0.72rem;color:#8b949e;">Max Magnitude</div>
+      <div style="font-size:1.4rem;font-weight:700;color:#c0392b;">{max_mag:.1f}</div>
+      <div style="font-size:0.72rem;color:#7a5c3a;">Max Magnitude</div>
+    </div>""", unsafe_allow_html=True)
+
+    # Detection capability
+    total_eq = len(eq_near)
+    eq_before_anom = 0
+    for t in radon_anom.index:
+        window_start = t - pd.Timedelta(days=30)
+        matched = eq_near[
+            (eq_near["Time (Thailand)"] >= t) &
+            (eq_near["Time (Thailand)"] <= t + pd.Timedelta(days=30)) &
+            (eq_near["Magnitude"] >= mag_threshold)
+        ]
+        eq_before_anom += len(matched)
+    detect_pct = min(100.0, (eq_before_anom / total_eq * 100)) if total_eq > 0 else 0
+    detect_color = "#2e8b57" if detect_pct >= 60 else "#c8860a" if detect_pct >= 30 else "#c0392b"
+    st.markdown(f"""
+    <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:8px;
+                padding:10px;margin-bottom:8px;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:700;color:{detect_color};">{detect_pct:.1f}%</div>
+      <div style="font-size:0.72rem;color:#7a5c3a;">🎯 จับสัญญาณ EQ ได้</div>
+      <div style="font-size:0.65rem;color:#a08060;">M≥{mag_threshold} ใน 30 วันหลัง Anomaly</div>
     </div>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
