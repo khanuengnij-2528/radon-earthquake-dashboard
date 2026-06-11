@@ -796,6 +796,124 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 7 — Risk Prediction vs Actual Earthquake Verification
+# ═══════════════════════════════════════════════════════════════════════════
+st.markdown('<div class="section-header">✅ Section 7 — เปรียบเทียบ Risk ที่ทำนาย vs แผ่นดินไหวจริง</div>', unsafe_allow_html=True)
+
+# สร้างตารางเปรียบเทียบจากทุก anomaly
+verify_rows = []
+for anom_time in radon_anom.index:
+    radon_val = float(radon_anom.loc[anom_time]) if not isinstance(radon_anom.loc[anom_time], pd.Series) else float(radon_anom.loc[anom_time].iloc[0])
+    # คำนวณ hazard สำหรับ anomaly นี้
+    T_v = dt_df[f"dt_M{key}"]
+    E_v = dt_df[f"ev_M{key}"]
+    haz_v = piecewise_hazard(T_v.values, E_v.values, max_day=days_ahead)
+    peak_h = float(haz_v["hazard"].max()) if haz_v["hazard"].notna().any() else 0.0
+    rl = risk_level(peak_h)
+
+    # หา EQ จริงที่เกิดใน 30 วันหลัง anomaly
+    t_end = anom_time + pd.Timedelta(days=days_ahead)
+    eq_after = eq_near[
+        (eq_near["Time (Thailand)"] > anom_time) &
+        (eq_near["Time (Thailand)"] <= t_end) &
+        (eq_near["Magnitude"] >= _snap)
+    ]
+    eq_count_v = len(eq_after)
+    eq_max_mag = float(eq_after["Magnitude"].max()) if eq_count_v > 0 else 0.0
+    eq_first = eq_after["Time (Thailand)"].min().strftime("%Y-%m-%d") if eq_count_v > 0 else "-"
+    dt_days = int((eq_after["Time (Thailand)"].min() - anom_time).total_seconds() / 86400) if eq_count_v > 0 else None
+    matched = "✅ ใช่" if eq_count_v > 0 else "❌ ไม่"
+
+    verify_rows.append({
+        "Anomaly Date": anom_time.strftime("%Y-%m-%d"),
+        "Radon (pCi/L)": round(radon_val, 2),
+        "Peak Hazard": round(peak_h, 4),
+        "Risk Level": rl,
+        "EQ จริงไหม": matched,
+        "EQ แรก": eq_first,
+        "Δt (วัน)": dt_days if dt_days is not None else "-",
+        "Max Mag": round(eq_max_mag, 1) if eq_count_v > 0 else "-",
+        "จำนวน EQ": eq_count_v,
+    })
+
+verify_df = pd.DataFrame(verify_rows)
+
+# ── กราฟ ──────────────────────────────────────────────────────────────────
+st.markdown("**📊 กราฟ: Peak Hazard ที่ทำนาย vs แผ่นดินไหวจริง**")
+
+fig7 = go.Figure()
+
+# แยก matched / not matched
+matched_df  = verify_df[verify_df["EQ จริงไหม"] == "✅ ใช่"]
+no_match_df = verify_df[verify_df["EQ จริงไหม"] == "❌ ไม่"]
+
+fig7.add_trace(go.Bar(
+    x=matched_df["Anomaly Date"], y=matched_df["Peak Hazard"],
+    name="✅ มี EQ จริง", marker_color="#2e8b57", opacity=0.85
+))
+fig7.add_trace(go.Bar(
+    x=no_match_df["Anomaly Date"], y=no_match_df["Peak Hazard"],
+    name="❌ ไม่มี EQ", marker_color="#c0392b", opacity=0.6
+))
+
+# scatter EQ จริง
+eq_plot7 = eq_near[eq_near["Magnitude"] >= _snap].copy()
+fig7.add_trace(go.Scatter(
+    x=eq_plot7["Time (Thailand)"].dt.strftime("%Y-%m-%d"),
+    y=[0.01] * len(eq_plot7),
+    mode="markers", name=f"EQ จริง M≥{_snap}",
+    marker=dict(color="#f1c40f", size=eq_plot7["Magnitude"]*2,
+                symbol="triangle-up", opacity=0.8)
+))
+
+fig7.add_hline(y=0.10, line_dash="dash", line_color="#f0883e",
+               annotation_text="HIGH (0.10)", annotation_font_color="#f0883e")
+fig7.add_hline(y=0.20, line_dash="dash", line_color="#c0392b",
+               annotation_text="VERY HIGH (0.20)", annotation_font_color="#c0392b")
+
+dark_layout(fig7, f"Peak Hazard ที่ทำนาย vs EQ จริง M≥{_snap} (R≤{radius_km}km)", height=360)
+fig7.update_layout(barmode="overlay", xaxis_title="Anomaly Date", yaxis_title="Peak Hazard Rate")
+st.plotly_chart(fig7, use_container_width=True)
+
+# ── Summary stats ──────────────────────────────────────────────────────────
+n_total   = len(verify_df)
+n_hit     = len(matched_df)
+n_miss    = len(no_match_df)
+hit_rate  = n_hit / n_total * 100 if n_total > 0 else 0
+
+sc1, sc2, sc3, sc4 = st.columns(4)
+sc1.metric("📊 Anomaly ทั้งหมด", f"{n_total:,}")
+sc2.metric("✅ ทำนายถูก (มี EQ)", f"{n_hit:,}", f"{hit_rate:.1f}%")
+sc3.metric("❌ ทำนายผิด (ไม่มี EQ)", f"{n_miss:,}", f"{100-hit_rate:.1f}%")
+sc4.metric("🎯 Accuracy", f"{hit_rate:.1f}%")
+
+# ── ตาราง ──────────────────────────────────────────────────────────────────
+st.markdown("**📋 ตาราง: รายละเอียด Anomaly vs EQ จริง**")
+
+# Color code Risk Level
+def color_risk(val):
+    colors = {"LOW":"#2e8b57","MODERATE":"#c8860a","HIGH":"#c05000","VERY HIGH":"#c0392b"}
+    c = colors.get(val, "#2c2c2c")
+    return f"color: {c}; font-weight: bold"
+
+def color_match(val):
+    if "✅" in str(val): return "color: #2e8b57; font-weight: bold"
+    return "color: #c0392b; font-weight: bold"
+
+styled = verify_df.style    .applymap(color_risk, subset=["Risk Level"])    .applymap(color_match, subset=["EQ จริงไหม"])    .format({"Peak Hazard": "{:.4f}", "Radon (pCi/L)": "{:.2f}"})    .set_properties(**{"background-color": "#fff8f0", "color": "#2c2c2c",
+                       "border": "1px solid #d4b896"})
+
+st.dataframe(styled, use_container_width=True, height=400)
+
+# Download
+st.download_button(
+    "⬇️ Download Verification Table CSV",
+    verify_df.to_csv(index=False),
+    "risk_verification.csv", "text/csv"
+)
+
 # ─── Real-time auto-refresh ───────────────────────────────────────────────────
 if realtime:
     time.sleep(refresh_sec)
