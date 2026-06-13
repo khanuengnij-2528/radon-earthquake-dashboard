@@ -97,7 +97,7 @@ st.markdown("""
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 SHEET_URL   = "https://docs.google.com/spreadsheets/d/1NtKV_9fanjFD-mm-qVkUWQ-LGIv_0hD4d5A8dSuwdOk/edit?gid=0#gid=0"
-XLSX_URL    = "https://docs.google.com/spreadsheets/d/1WYUklLBMentJ1_GkhZ0Kxob2e77Bxaq8/export?format=xlsx&gid=2058199297"
+XLSX_URL    = "https://docs.google.com/spreadsheets/d/1ZXCX5H5YJzFdYyuIGZnpYmCBuKRbfz8rx9qT_ZXc8bc/export?format=xlsx&gid=2058199297"
 RADON_COL   = "Short Term (pCi/L)"
 TIME_COL    = "Timestamp"
 CACHE_TTL   = 300   # cache 5 นาที
@@ -213,11 +213,45 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return R * 2 * np.arcsin(np.sqrt(a))
 
 def compute_iqr_anomaly(radon):
+    """Global IQR — ใช้สำหรับ display stats เท่านั้น"""
     Q1, Q3 = radon.quantile(0.25), radon.quantile(0.75)
     IQR = Q3 - Q1
     upper = Q3 + 1.5 * IQR
     anomalies = radon[radon > upper].dropna()
     return Q1, Q3, IQR, upper, anomalies
+
+def compute_rolling_iqr_anomaly(radon, window_days=30):
+    """
+    Rolling IQR Anomaly Detection
+    คำนวณ Q1, Q3, IQR ใหม่ทุก window_days วัน
+    สะท้อนพฤติกรรมปัจจุบันได้แม่นยำกว่า Global IQR
+    อ้างอิง: Sliding Window Analysis (Non-stationary Time Series)
+    """
+    radon_daily = radon.resample("D").median()  # รวมเป็นรายวัน
+    anomaly_flags = pd.Series(False, index=radon.index)
+    upper_series  = pd.Series(np.nan, index=radon.index)
+
+    # คำนวณ rolling IQR ทีละ window
+    dates = radon_daily.index
+    for i in range(window_days, len(dates)+1):
+        window = radon_daily.iloc[i-window_days:i]
+        Q1_w = window.quantile(0.25)
+        Q3_w = window.quantile(0.75)
+        IQR_w = Q3_w - Q1_w
+        upper_w = Q3_w + 1.5 * IQR_w
+
+        # ใช้กับข้อมูลในวันสุดท้ายของ window
+        day = dates[i-1]
+        mask = radon.index.normalize() == day
+        upper_series[mask] = upper_w
+        anomaly_flags[mask] = radon[mask] > upper_w
+
+    anomalies = radon[anomaly_flags].dropna()
+    # Global stats สำหรับแสดงผล
+    Q1, Q3 = radon.quantile(0.25), radon.quantile(0.75)
+    IQR = Q3 - Q1
+    upper_global = Q3 + 1.5 * IQR
+    return Q1, Q3, IQR, upper_global, anomalies, upper_series
 
 def time_to_first_eq(anomaly_time, eq_near, days_ahead=30, min_mag=4.0):
     t0 = pd.to_datetime(anomaly_time)
@@ -321,11 +355,12 @@ eq_sel["distance_km"] = haversine_km(
     station[0], station[1], eq_sel["Latitude"].values, eq_sel["Longitude"].values)
 eq_near = eq_sel[eq_sel["distance_km"] <= radius_km].copy()
 
-# IQR
-Q1, Q3, IQR, upper, radon_anom = compute_iqr_anomaly(radon)
+# Rolling IQR (30-day window) — สะท้อนพฤติกรรมปัจจุบัน
+Q1, Q3, IQR, upper, radon_anom, upper_rolling = compute_rolling_iqr_anomaly(radon, window_days=30)
 
-# Time-to-EQ survival data (sample 300 anomalies max for speed)
-sample_anom = radon_anom.iloc[::max(1, len(radon_anom)//300)]
+# Time-to-EQ survival data — ใช้ 1,000 anomaly ล่าสุด
+# อ้างอิง: Recency Bias in Precursor Studies + Sliding Window Analysis
+sample_anom = radon_anom.iloc[-1000:] if len(radon_anom) > 1000 else radon_anom
 min_mag_list = [3.0, 4.0, 5.0]
 rows = []
 for t in sample_anom.index:
@@ -418,7 +453,17 @@ fig1.add_trace(go.Scatter(
                 line=dict(color="#ff7b72", width=1))
 ))
 fig1.add_hline(y=float(upper), line_dash="dash", line_color="#f0883e",
-               annotation_text=f"IQR Upper = {upper:.2f}", annotation_font_color="#f0883e")
+               annotation_text=f"Global IQR Upper = {upper:.2f}", annotation_font_color="#f0883e")
+# Rolling IQR upper bound
+upper_r = upper_rolling.dropna()
+if len(upper_r) > 0:
+    step_r = max(1, len(upper_r)//500)
+    fig1.add_trace(go.Scatter(
+        x=upper_r.iloc[::step_r].index,
+        y=upper_r.iloc[::step_r].values,
+        mode="lines", name="Rolling IQR Upper (30d)",
+        line=dict(color="#e3b341", width=1.2, dash="dot"), opacity=0.8
+    ))
 fig1.add_hline(y=float(Q3), line_dash="dot", line_color="#3fb950",
                annotation_text=f"Q3={Q3:.2f}", annotation_font_color="#3fb950")
 dark_layout(fig1, f"Radon Short Term — {len(radon_anom)} anomalies detected", height=300)
