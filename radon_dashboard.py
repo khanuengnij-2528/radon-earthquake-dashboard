@@ -97,7 +97,9 @@ st.markdown("""
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 SHEET_URL   = "https://docs.google.com/spreadsheets/d/1NtKV_9fanjFD-mm-qVkUWQ-LGIv_0hD4d5A8dSuwdOk/edit?gid=0#gid=0"
-XLSX_URL    = "https://docs.google.com/spreadsheets/d/1ZXCX5H5YJzFdYyuIGZnpYmCBuKRbfz8rx9qT_ZXc8bc/export?format=xlsx&gid=2058199297"
+XLSX_URL    = "https://docs.google.com/spreadsheets/d/1ZXCX5H5YJzFdYyuIGZnpYmCBuKRbfz8rx9qT_ZXc8bc/export?format=xlsx&gid=2058199297"  # fallback only
+EQ_SHEET_ID = "1ZXCX5H5YJzFdYyuIGZnpYmCBuKRbfz8rx9qT_ZXc8bc"
+EQ_GID      = "2058199297"
 RADON_COL   = "Short Term (pCi/L)"
 TIME_COL    = "Timestamp"
 CACHE_TTL   = 300   # cache 5 นาที
@@ -154,12 +156,30 @@ def load_radon_data():
 
 @st.cache_data(ttl=CACHE_TTL)
 def load_eq_data():
-    """ดึง Earthquake จาก Excel URL → คืน pd.DataFrame"""
+    """ดึง Earthquake จาก Google Sheets ผ่าน gspread (ใช้ Service Account เดิม)"""
     try:
-        eq = pd.read_excel(XLSX_URL, engine="openpyxl")
+        gc  = get_gspread_client()
+        sh  = gc.open_by_key(EQ_SHEET_ID)
+        # หา worksheet จาก gid
+        ws  = None
+        for w in sh.worksheets():
+            if str(w.id) == EQ_GID:
+                ws = w
+                break
+        if ws is None:
+            ws = sh.get_worksheet(0)
 
-        if "Time (Thailand)" not in eq.columns:
-            raise ValueError("ไม่พบคอลัมน์ 'Time (Thailand)'")
+        records = ws.get_all_records()
+        eq = pd.DataFrame(records)
+
+        if eq.empty:
+            raise ValueError("ไม่มีข้อมูลใน sheet")
+
+        # หาคอลัมน์เวลา
+        time_col = next((c for c in eq.columns if "time" in c.lower() or "วัน" in c.lower()), None)
+        if time_col is None:
+            raise ValueError(f"ไม่พบคอลัมน์เวลา columns={list(eq.columns)}")
+        eq = eq.rename(columns={time_col: "Time (Thailand)"})
 
         eq["Time (Thailand)"] = pd.to_datetime(eq["Time (Thailand)"], errors="coerce")
         eq = eq.dropna(subset=["Time (Thailand)"]).sort_values("Time (Thailand)").reset_index(drop=True)
@@ -170,16 +190,19 @@ def load_eq_data():
             s = str(x).strip()
             if s.endswith("°N"): return float(s.replace("°N",""))
             if s.endswith("°S"): return -float(s.replace("°S",""))
-            return float(s)
+            try: return float(s)
+            except: return np.nan
 
         def parse_lon(x):
             s = str(x).strip()
             if s.endswith("°E"): return float(s.replace("°E",""))
             if s.endswith("°W"): return -float(s.replace("°W",""))
-            return float(s)
+            try: return float(s)
+            except: return np.nan
 
         eq["Latitude"]  = eq["Latitude"].apply(parse_lat)
         eq["Longitude"] = eq["Longitude"].apply(parse_lon)
+        eq = eq.dropna(subset=["Latitude","Longitude"])
         return eq
 
     except Exception as e:
