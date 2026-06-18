@@ -836,10 +836,12 @@ for anom_time in radon_anom.index:
 
     # หา EQ จริงที่เกิดใน 30 วันหลัง anomaly
     t_end = anom_time + pd.Timedelta(days=days_ahead)
+    # ใช้ mag_threshold จริงๆ ที่ผู้ใช้เลือก (ไม่ใช่ _snap)
+    # และใช้ eq_near ที่ผ่าน radius filter แล้ว
     eq_after = eq_near[
         (eq_near["Time (Thailand)"] > anom_time) &
         (eq_near["Time (Thailand)"] <= t_end) &
-        (eq_near["Magnitude"] >= _snap)
+        (eq_near["Magnitude"] >= mag_threshold)
     ]
     eq_count_v = len(eq_after)
     eq_max_mag = float(eq_after["Magnitude"].max()) if eq_count_v > 0 else 0.0
@@ -860,6 +862,7 @@ for anom_time in radon_anom.index:
     })
 
 verify_df = pd.DataFrame(verify_rows)
+verify_df = verify_df.sort_values("Anomaly Date", ascending=False).reset_index(drop=True)
 
 # ── กราฟ ──────────────────────────────────────────────────────────────────
 st.markdown("**📊 กราฟ: Peak Hazard ที่ทำนาย vs แผ่นดินไหวจริง**")
@@ -939,17 +942,39 @@ st.download_button(
     "risk_verification.csv", "text/csv"
 )
 
-# ─── Visit Counter (session + cumulative) ────────────────────────────────────
+# ─── Visit Counter (session + cumulative via file) ───────────────────────────
+import os, json
+
+COUNTER_FILE = "/tmp/visitor_count.json"
+
+def load_total_visits():
+    try:
+        if os.path.exists(COUNTER_FILE):
+            with open(COUNTER_FILE, "r") as f:
+                return json.load(f).get("total", 0)
+    except:
+        pass
+    return 0
+
+def save_total_visits(n):
+    try:
+        with open(COUNTER_FILE, "w") as f:
+            json.dump({"total": n}, f)
+    except:
+        pass
+
+# นับ session ปัจจุบัน
 if "visit_count" not in st.session_state:
     st.session_state.visit_count = 0
 if "counted" not in st.session_state:
     st.session_state.visit_count += 1
     st.session_state.counted = True
-
-# cumulative counter ใช้ st.session_state shared key simulate
-if "total_visits" not in st.session_state:
-    st.session_state.total_visits = 1000  # ค่าเริ่มต้น base
-st.session_state.total_visits += 0  # คงค่าไว้
+    # บวกยอดสะสม
+    _total = load_total_visits() + 1
+    save_total_visits(_total)
+    st.session_state.total_visits = _total
+elif "total_visits" not in st.session_state:
+    st.session_state.total_visits = load_total_visits()
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -981,8 +1006,8 @@ st.markdown(f"""
       {st.session_state.visit_count:,}
     </span> ครั้ง<br>
     <span style="font-size:0.75rem;color:#7a5c3a;">
-      🌐 ผู้เข้าชมสะสม (ประมาณ):
-      <b style="color:#a0522d;">{st.session_state.total_visits + st.session_state.visit_count:,}</b> ครั้ง
+      🌐 ผู้เข้าชมสะสม:
+      <b style="color:#a0522d;">{st.session_state.total_visits:,}</b> ครั้ง
     </span>
   </div>
   <div style="font-size:0.82rem;color:#7a5c3a;text-align:center;flex:1;">
