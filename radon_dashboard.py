@@ -848,6 +848,15 @@ for anom_time in radon_anom.index:
     eq_first = eq_after["Time (Thailand)"].min().strftime("%Y-%m-%d") if eq_count_v > 0 else "-"
     dt_days = int((eq_after["Time (Thailand)"].min() - anom_time).total_seconds() / 86400) if eq_count_v > 0 else None
     matched = "✅ ใช่" if eq_count_v > 0 else "❌ ไม่"
+    # Region ของ EQ แรกที่เกิดขึ้น
+    if eq_count_v > 0:
+        first_eq_row = eq_after.loc[eq_after["Time (Thailand)"].idxmin()]
+        region_col = next((c for c in eq_after.columns if "region" in c.lower() or "พื้นที่" in c.lower()), None)
+        eq_region = str(first_eq_row[region_col]) if region_col else "-"
+        # ตัดให้สั้นลงถ้ายาวเกิน
+        eq_region = eq_region[:50] + "..." if len(eq_region) > 50 else eq_region
+    else:
+        eq_region = "-"
 
     verify_rows.append({
         "Anomaly Date": anom_time.strftime("%Y-%m-%d"),
@@ -858,6 +867,7 @@ for anom_time in radon_anom.index:
         "EQ แรก": eq_first,
         "Δt (วัน)": dt_days if dt_days is not None else "-",
         "Max Mag": round(eq_max_mag, 1) if eq_count_v > 0 else "-",
+        "Region": eq_region,
         "จำนวน EQ": eq_count_v,
     })
 
