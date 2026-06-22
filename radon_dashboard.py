@@ -1033,6 +1033,180 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 8 — Parameter Optimization (Grid Search)
+# ═══════════════════════════════════════════════════════════════════════════
+st.markdown('<div class="section-header">🎯 Section 8 — Parameter Optimization (Grid Search)</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<div style="background:#fff8f0;border:1px solid #d4b896;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:0.82rem;color:#2c2c2c;">
+  <b>🔬 หลักการ:</b> Grid Search ลองทุก combination ของ Magnitude / Radius / Window
+  แล้วหาว่า combination ไหนให้ <b>Accuracy สูงสุด</b> สำหรับข้อมูลของสถานีนี้<br>
+  อ้างอิง: Sensitivity Analysis in Radon Precursor Studies (Cicerone et al., 2009)
+</div>
+""", unsafe_allow_html=True)
+
+# ── Parameter Grid ────────────────────────────────────────────────────────
+g1, g2, g3 = st.columns(3)
+with g1:
+    grid_mags = st.multiselect(
+        "⚡ Magnitude options",
+        options=[1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0],
+        default=[1.5, 2.0, 2.5, 3.0, 4.0]
+    )
+with g2:
+    grid_radii = st.multiselect(
+        "📡 Radius options (km)",
+        options=[100, 200, 300, 500, 700, 1000],
+        default=[200, 300, 500, 700, 1000]
+    )
+with g3:
+    grid_windows = st.multiselect(
+        "📆 Window options (days)",
+        options=[7, 14, 21, 30, 45, 60],
+        default=[7, 14, 21, 30]
+    )
+
+total_combinations = len(grid_mags) * len(grid_radii) * len(grid_windows)
+st.markdown(f"**จำนวน combination ทั้งหมด: {total_combinations} แบบ**")
+
+run_grid = st.button("🚀 รัน Grid Search", type="primary", disabled=total_combinations == 0)
+
+if run_grid and total_combinations > 0:
+    progress = st.progress(0, text="กำลังคำนวณ...")
+    grid_results = []
+    total = total_combinations
+    done = 0
+
+    # sample anomaly สำหรับ grid search (ใช้ 200 ล่าสุดเพื่อความเร็ว)
+    grid_anom = radon_anom.iloc[-200:] if len(radon_anom) > 200 else radon_anom
+
+    for mag in grid_mags:
+        for rad in grid_radii:
+            for win in grid_windows:
+                # กรอง EQ ตาม radius นี้
+                eq_grid = eq_sel[eq_sel["distance_km"] <= rad].copy()
+
+                n_hit = 0
+                n_total_g = 0
+                for at in grid_anom.index:
+                    t_end = at + pd.Timedelta(days=win)
+                    eq_match = eq_grid[
+                        (eq_grid["Time (Thailand)"] > at) &
+                        (eq_grid["Time (Thailand)"] <= t_end) &
+                        (eq_grid["Magnitude"] >= mag)
+                    ]
+                    n_total_g += 1
+                    if len(eq_match) > 0:
+                        n_hit += 1
+
+                acc = n_hit / n_total_g * 100 if n_total_g > 0 else 0
+                sens = n_hit / max(1, len(eq_grid[eq_grid["Magnitude"] >= mag])) * 100
+
+                grid_results.append({
+                    "Magnitude": mag,
+                    "Radius (km)": rad,
+                    "Window (days)": win,
+                    "Hit": n_hit,
+                    "Total": n_total_g,
+                    "Accuracy (%)": round(acc, 1),
+                    "Sensitivity (%)": round(min(sens, 100), 1),
+                })
+
+                done += 1
+                progress.progress(done / total, text=f"คำนวณ {done}/{total} combinations...")
+
+    progress.empty()
+    grid_df = pd.DataFrame(grid_results).sort_values("Accuracy (%)", ascending=False).reset_index(drop=True)
+
+    # ── Best Parameters ────────────────────────────────────────────────────
+    best = grid_df.iloc[0]
+    st.markdown(f"""
+    <div style="background:#fff8f0;border:2px solid #a0522d;border-radius:12px;
+                padding:16px 24px;margin:12px 0;text-align:center;">
+      <div style="font-size:1rem;font-weight:700;color:#a0522d;margin-bottom:8px;">
+        🏆 Best Parameters
+      </div>
+      <div style="font-size:0.9rem;color:#2c2c2c;">
+        Magnitude ≥ <b style="color:#c05000;">{best['Magnitude']}</b> &nbsp;|&nbsp;
+        Radius <b style="color:#c05000;">{best['Radius (km)']:.0f} km</b> &nbsp;|&nbsp;
+        Window <b style="color:#c05000;">{best['Window (days)']:.0f} วัน</b>
+      </div>
+      <div style="font-size:1.3rem;font-weight:700;color:#2e8b57;margin-top:8px;">
+        Accuracy: {best['Accuracy (%)']:.1f}%
+      </div>
+      <div style="font-size:0.75rem;color:#7a5c3a;margin-top:4px;">
+        จาก {int(best['Hit'])} anomaly ที่ตรงกับ EQ จริง / {int(best['Total'])} anomaly ทั้งหมด
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Heatmap: Accuracy vs Mag x Radius (window ที่ดีที่สุด) ──────────────
+    best_win = int(best["Window (days)"])
+    heatmap_df = grid_df[grid_df["Window (days)"] == best_win].pivot_table(
+        index="Magnitude", columns="Radius (km)", values="Accuracy (%)"
+    )
+
+    fig8a = go.Figure(go.Heatmap(
+        z=heatmap_df.values,
+        x=[f"{int(c)} km" for c in heatmap_df.columns],
+        y=[f"M≥{r}" for r in heatmap_df.index],
+        colorscale=[[0,"#fff8f0"],[0.5,"#f0883e"],[1,"#2e8b57"]],
+        text=heatmap_df.values.round(1),
+        texttemplate="%{text}%",
+        showscale=True,
+        colorbar=dict(title="Accuracy %")
+    ))
+    dark_layout(fig8a, f"Heatmap: Accuracy (%) — Window={best_win} วัน", height=350)
+    fig8a.update_layout(
+        paper_bgcolor="#fdf6ec",
+        plot_bgcolor="#fdf6ec",
+        xaxis_title="Radius (km)",
+        yaxis_title="Magnitude Threshold"
+    )
+    st.plotly_chart(fig8a, use_container_width=True)
+
+    # ── Line chart: Accuracy vs Window (best mag + radius) ───────────────────
+    best_mag = best["Magnitude"]
+    best_rad = best["Radius (km)"]
+    line_df = grid_df[
+        (grid_df["Magnitude"] == best_mag) &
+        (grid_df["Radius (km)"] == best_rad)
+    ].sort_values("Window (days)")
+
+    fig8b = go.Figure()
+    fig8b.add_trace(go.Scatter(
+        x=line_df["Window (days)"], y=line_df["Accuracy (%)"],
+        mode="lines+markers+text",
+        text=line_df["Accuracy (%)"].apply(lambda x: f"{x:.1f}%"),
+        textposition="top center",
+        line=dict(color="#a0522d", width=2),
+        marker=dict(size=10, color="#a0522d")
+    ))
+    dark_layout(fig8b, f"Accuracy vs Window Time (M≥{best_mag}, R={best_rad:.0f}km)", height=300)
+    fig8b.update_layout(
+        paper_bgcolor="#fdf6ec", plot_bgcolor="#fdf6ec",
+        xaxis_title="Window (days)", yaxis_title="Accuracy (%)"
+    )
+    st.plotly_chart(fig8b, use_container_width=True)
+
+    # ── Top 10 Table ──────────────────────────────────────────────────────────
+    st.markdown("**📋 Top 10 Best Combinations**")
+    st.dataframe(
+        grid_df.head(10).style.background_gradient(
+            subset=["Accuracy (%)"], cmap="RdYlGn"
+        ).format({"Accuracy (%)": "{:.1f}%", "Sensitivity (%)": "{:.1f}%"}),
+        use_container_width=True, height=380
+    )
+
+    # Download
+    st.download_button(
+        "⬇️ Download Grid Search Results CSV",
+        grid_df.to_csv(index=False),
+        "grid_search_results.csv", "text/csv"
+    )
+
 # ─── Real-time auto-refresh ───────────────────────────────────────────────────
 if realtime:
     time.sleep(refresh_sec)
