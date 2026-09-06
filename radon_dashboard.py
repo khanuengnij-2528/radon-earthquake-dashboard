@@ -123,31 +123,57 @@ def get_gspread_client():
 # ─── Real Data Loaders ────────────────────────────────────────────────────────
 @st.cache_data(ttl=CACHE_TTL)
 def load_radon_data():
-    """ดึง Radon จาก Google Sheets → คืน pd.Series index=Timestamp"""
+    """ดึง Radon จาก Google Sheets → คืน pd.Series index=Timestamp
+    โครงสร้าง Sheet ใหม่: Timestamp (dd/mm/yyyy HH:MM:SS ค.ศ.), Short Term (pCi/L)
+    """
     try:
         gc = get_gspread_client()
         ws = gc.open_by_url(SHEET_URL).sheet1
         df = pd.DataFrame(ws.get_all_records())
         df.columns = df.columns.str.strip()
 
-        # รวม Date + Time ถ้าแยกคอลัมน์
-        if "Date" in df.columns and "Time" in df.columns and TIME_COL not in df.columns:
-            df[TIME_COL] = df["Date"].astype(str) + " " + df["Time"].astype(str)
+        # Timestamp อยู่ในรูปแบบ dd/mm/yyyy HH:MM:SS (ค.ศ. แล้ว ไม่ต้องแปลง)
+        if TIME_COL not in df.columns:
+            # ลองหาคอลัมน์ที่ชื่อใกล้เคียง
+            time_candidates = [c for c in df.columns if "time" in c.lower() or "stamp" in c.lower() or "date" in c.lower()]
+            if time_candidates:
+                df = df.rename(columns={time_candidates[0]: TIME_COL})
+            else:
+                raise ValueError(f"ไม่พบคอลัมน์ Timestamp columns={list(df.columns)}")
 
-        # แปลง พ.ศ. → ค.ศ.
-        def convert_thai_date(x):
-            parts = str(x).strip().split(" ")
-            date_part, time_part = parts[0], parts[1] if len(parts) > 1 else "00:00:00"
-            d, m, y = date_part.split("/")
-            y_ce = int(y) - 543
-            return f"{d}/{m}/{y_ce} {time_part}"
+        # แปลง Timestamp — รองรับทั้ง dd/mm/yyyy และ yyyy-mm-dd
+        def parse_timestamp(x):
+            s = str(x).strip()
+            # ลอง format dd/mm/yyyy HH:MM:SS ก่อน
+            for fmt in ["%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                        "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M"]:
+                try:
+                    return pd.to_datetime(s, format=fmt)
+                except:
+                    pass
+            # fallback
+            return pd.to_datetime(s, errors="coerce")
 
-        df[TIME_COL] = df[TIME_COL].apply(convert_thai_date)
-        df[TIME_COL] = pd.to_datetime(df[TIME_COL], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+        df[TIME_COL] = df[TIME_COL].apply(parse_timestamp)
         df = df.dropna(subset=[TIME_COL]).set_index(TIME_COL).sort_index()
 
-        radon = pd.to_numeric(df[RADON_COL], errors="coerce").replace(0, np.nan)
-        radon = radon[radon <= 100]  # กรองค่าผิดปกติเกิน 100 pCi/L ออก
+        # ใช้ Short Term (pCi/L)
+        radon_col = RADON_COL  # "Short Term (pCi/L)"
+        if radon_col not in df.columns:
+            # หาคอลัมน์ที่ชื่อใกล้เคียง
+            short_candidates = [c for c in df.columns if "short" in c.lower()]
+            if short_candidates:
+                radon_col = short_candidates[0]
+            else:
+                raise ValueError(f"ไม่พบคอลัมน์ Short Term columns={list(df.columns)}")
+
+        radon = pd.to_numeric(df[radon_col], errors="coerce").replace(0, np.nan)
+        radon = radon[radon <= 100]  # กรองค่าผิดปกติเกิน 100 pCi/L
+
+        # ลบแถวซ้ำ (ข้อมูลซ้ำ 3 แถวต่อครั้ง) — เก็บเฉพาะ unique timestamp
+        radon = radon[~radon.index.duplicated(keep="first")]
+
+        st.sidebar.markdown(f"📡 Radon col: `{radon_col}` | rows after dedup: `{len(radon):,}`")
         return radon
 
     except Exception as e:
@@ -393,7 +419,11 @@ for t in sample_anom.index:
         row[f"dt_M{str(m).replace('.','')}"]=dt
         row[f"ev_M{str(m).replace('.','')}"]=ev
     rows.append(row)
-dt_df = pd.DataFrame(rows).set_index("Anomaly_Time")
+if not rows:
+    dt_df = pd.DataFrame(columns=["pCi/L","dt_M30","ev_M30","dt_M40","ev_M40","dt_M50","ev_M50"])
+    dt_df.index.name = "Anomaly_Time"
+else:
+    dt_df = pd.DataFrame(rows).set_index("Anomaly_Time")
 
 T3,E3 = dt_df["dt_M30"], dt_df["ev_M30"]
 T4,E4 = dt_df["dt_M40"], dt_df["ev_M40"]
