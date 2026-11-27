@@ -6,7 +6,10 @@ Real-time — Google Sheets (Radon_001: RADON_A เรดอนในดิน /
 - แหล่งข้อมูลเป็นชีต Radon_001 (บันทึกทุก 5 นาที, หน่วย Bq/m³)
 - เลือกช่องวัดใน sidebar: RADON_A (ดิน) หรือ RADON_B (อากาศ) → ทุก Section วิเคราะห์ตามช่องที่เลือก
 - รวมข้อมูลเป็นค่ามัธยฐานรายชั่วโมงก่อนวิเคราะห์ (เซนเซอร์ค้างค่าเดิมหลายรอบ 5 นาที)
-- เพิ่ม Section 1B เปรียบเทียบเรดอนในดิน vs ในอากาศ
+- เพิ่มกราฟเปรียบเทียบเรดอนในดิน vs ในอากาศ
+
+UI (27/11/2026): ธีมมืดแบบห้องควบคุม แบ่ง 5 แท็บ มีแถบสถานะ "ความเสี่ยงวันนี้" ด้านบน
+เลิกใช้กราฟสองแกน (dual axis) — แยกเป็นกราฟซ้อนที่ใช้แกนเวลาเดียวกันแทน
 - พิกัดสถานีอ่านจากคอลัมน์ location ในชีตอัตโนมัติ
 """
 
@@ -34,51 +37,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# ─── CSS Theme ───────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-  /* Cream Theme */
-  .stApp { background-color: #fdf6ec; color: #2c2c2c; }
-  [data-testid="stSidebar"] { background-color: #f5ead8; border-right: 1px solid #d4b896; color: #2c2c2c !important; }
-  [data-testid="stSidebar"] * { color: #2c2c2c !important; }
-  [data-testid="stSidebar"] input { color: #2c2c2c !important; background-color: #fff8f0 !important; border: 1px solid #d4b896 !important; }
-  /* Download buttons */
-  [data-testid="stDownloadButton"] button { color: #fff8f0 !important; background-color: #a0522d !important; border: 1px solid #a0522d !important; }
-  [data-testid="stDownloadButton"] button:hover { background-color: #8b4513 !important; }
-  /* Metric cards */
-  div[data-testid="stMetric"] { background:#fff8f0; border:1px solid #d4b896; border-radius:10px; padding:12px; }
-  div[data-testid="stMetric"] label { color:#7a5c3a !important; font-size:0.72rem !important; }
-  div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size:1.6rem !important; color:#2c2c2c !important; }
-  .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-
-  /* Risk badges */
-  .badge-low      { background:#1a3a2a; color:#3fb950; border:1px solid #3fb950; border-radius:6px; padding:2px 10px; font-size:0.75rem; font-weight:600; }
-  .badge-moderate { background:#2d2a1a; color:#e3b341; border:1px solid #e3b341; border-radius:6px; padding:2px 10px; font-size:0.75rem; font-weight:600; }
-  .badge-high     { background:#3a2a1a; color:#f0883e; border:1px solid #f0883e; border-radius:6px; padding:2px 10px; font-size:0.75rem; font-weight:600; }
-  .badge-veryhigh { background:#3a1a1a; color:#ff7b72; border:1px solid #ff7b72; border-radius:6px; padding:2px 10px; font-size:0.75rem; font-weight:600; }
-
-  /* Section headers */
-  .section-header {
-    font-size: 1rem; font-weight: 600; color: #1a6fbf;
-    border-left: 3px solid #1a6fbf; padding-left: 10px;
-    margin: 8px 0 12px 0;
-  }
-
-  /* Live indicator */
-  .live-dot {
-    display:inline-block; width:8px; height:8px;
-    border-radius:50%; animation: pulse 1.5s infinite; margin-right:6px;
-  }
-  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
-
-  /* Scrollable table */
-  .risk-table { max-height:260px; overflow-y:auto; }
-  .risk-table table { width:100%; border-collapse:collapse; font-size:0.8rem; }
-  .risk-table th { background:#f5ead8; color:#7a5c3a; padding:6px 10px; text-align:left; position:sticky; top:0; }
-  .risk-table td { padding:6px 10px; border-bottom:1px solid #e8d8c0; }
-</style>
-""", unsafe_allow_html=True)
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 TZ_TH          = ZoneInfo("Asia/Bangkok")
@@ -431,34 +389,192 @@ def fmt_age(h):
     return f"{h / 24:.1f} วัน"
 
 
-RISK_COLOR = {"LOW": "#3fb950", "MODERATE": "#e3b341", "HIGH": "#f0883e", "VERY HIGH": "#ff7b72"}
-PLOT_BG = "#fdf6ec"
-GRID_COLOR = "#e8d8c0"
-LINE_COLOR = "#b89b78"
-FONT_COLOR = "#2c2c2c"
+# ─── Theme: Dark Control Room ─────────────────────────────────────────────────
+# ทุกสีอยู่ที่นี่ที่เดียว (แก้ธีมได้จากตรงนี้)
+C = {
+    "page":    "#0b0b0b",   # พื้นหลังหน้า
+    "panel":   "#141414",   # sidebar
+    "surface": "#191919",   # การ์ด/พื้นกราฟ
+    "raised":  "#222222",
+    "border":  "rgba(255,255,255,0.10)",
+    "ink":     "#efefef",   # ตัวอักษรหลัก
+    "ink2":    "#9c9c9c",   # ตัวอักษรรอง / แกน / legend
+    "grid":    "#303030",
+    "axis":    "#474747",
+    "accent":  "#338ced",
+    # status (ใช้เฉพาะระดับความเสี่ยง/สถานะ ไม่ใช้เป็นสีเส้นข้อมูล)
+    "good":    "#0aac23",
+    "warning": "#fbb315",
+    "serious": "#f18a59",
+    "critical": "#dc3c3d",
+    # สีของ "สิ่งที่วัด" (คงที่ตลอดทั้งหน้า)
+    "soil":    "#e76624",   # RADON_A
+    "air":     "#338ced",   # RADON_B
+    "eq":      "#9887ef",   # แผ่นดินไหว
+    "upper":   "#d28e05",   # เส้นขอบบน IQR
+}
+CHANNELS["RADON_A"]["color"] = C["soil"]
+CHANNELS["RADON_B"]["color"] = C["air"]
+
+RISK_COLOR = {"LOW": C["good"], "MODERATE": C["warning"], "HIGH": C["serious"], "VERY HIGH": C["critical"]}
+RISK_ICON = {"LOW": "●", "MODERATE": "▲", "HIGH": "▲▲", "VERY HIGH": "■"}
+RISK_TH = {"LOW": "ต่ำ", "MODERATE": "ปานกลาง", "HIGH": "สูง", "VERY HIGH": "สูงมาก"}
+MAG_COLOR = {3.0: "#9887ef", 4.0: "#e24d8b", 5.0: "#eb6263"}   # กลุ่มขนาดแผ่นดินไหว (categorical)
+
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+html, body, .stApp, [class*="css"] {{ font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }}
+.stApp {{ background: {C['page']}; color: {C['ink']}; }}
+.block-container {{ padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1500px; }}
+header[data-testid="stHeader"] {{ background: transparent; }}
+
+/* Sidebar */
+[data-testid="stSidebar"] {{ background: {C['panel']}; border-right: 1px solid {C['border']}; }}
+[data-testid="stSidebar"] * {{ color: {C['ink']}; }}
+[data-testid="stSidebar"] .side-h {{ font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+    color: {C['ink2']}; margin: 18px 0 6px; font-weight: 600; }}
+[data-testid="stSidebar"] input {{ background: {C['surface']} !important; color: {C['ink']} !important; }}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {{ gap: 4px; border-bottom: 1px solid {C['border']}; }}
+.stTabs [data-baseweb="tab"] {{ background: transparent; padding: 10px 16px;
+    border-radius: 8px 8px 0 0; font-weight: 500; }}
+.stTabs [aria-selected="true"] {{ color: {C['ink']} !important; background: {C['surface']}; }}
+.stTabs [data-baseweb="tab-highlight"] {{ background: {C['accent']}; }}
+
+/* Buttons */
+.stButton button, [data-testid="stDownloadButton"] button {{
+    background: {C['raised']}; color: {C['ink']}; border: 1px solid {C['border']}; border-radius: 8px; }}
+.stButton button:hover, [data-testid="stDownloadButton"] button:hover {{ border-color: {C['accent']}; color: {C['ink']}; }}
+.stButton button[kind="primary"] {{ background: {C['accent']}; border-color: {C['accent']}; color: #fff; }}
+
+/* Dataframe & expander */
+[data-testid="stExpander"] {{ background: {C['surface']}; border: 1px solid {C['border']}; border-radius: 12px; }}
+
+/* Components */
+.topbar {{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+    padding: 4px 2px 16px; border-bottom: 1px solid {C['border']}; margin-bottom: 16px; }}
+.topbar .t1 {{ font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; }}
+.topbar .t2 {{ font-size: .8rem; color: {C['ink2']}; margin-top: 2px; }}
+.pill {{ display:inline-flex; align-items:center; gap:6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid {C['border']}; background: {C['surface']}; font-size: .75rem; color: {C['ink']}; margin-left: 6px; }}
+.dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
+.dot.live {{ animation: pulse 1.6s infinite; }}
+@keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.25; }} }}
+.mono {{ font-family: 'JetBrains Mono', ui-monospace, monospace; }}
+
+.tile {{ background: {C['surface']}; border: 1px solid {C['border']}; border-radius: 14px; padding: 14px 16px; height: 100%; }}
+.tile .lab {{ font-size: .72rem; color: {C['ink2']}; letter-spacing: .04em; }}
+.tile .val {{ font-family: 'JetBrains Mono', monospace; font-size: 1.55rem; font-weight: 600; color: {C['ink']}; margin-top: 4px; line-height: 1.15; }}
+.tile .unit {{ font-size: .8rem; color: {C['ink2']}; font-weight: 400; margin-left: 4px; }}
+.tile .sub {{ font-size: .72rem; color: {C['ink2']}; margin-top: 6px; }}
+
+.hero {{ border-radius: 14px; padding: 16px 18px; height: 100%; border: 1px solid {C['border']}; }}
+.hero .lab {{ font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }}
+.hero .val {{ font-size: 1.9rem; font-weight: 700; margin-top: 2px; line-height: 1.1; }}
+.hero .sub {{ font-size: .75rem; margin-top: 6px; opacity: .85; }}
+
+.panel-h {{ font-size: .95rem; font-weight: 600; color: {C['ink']}; margin: 6px 0 2px; }}
+.panel-s {{ font-size: .78rem; color: {C['ink2']}; margin-bottom: 8px; }}
+.note {{ background: {C['surface']}; border: 1px solid {C['border']}; border-left: 3px solid {C['accent']};
+    border-radius: 10px; padding: 10px 14px; font-size: .8rem; color: {C['ink2']}; margin: 8px 0 12px; }}
+.badge {{ display:inline-block; padding: 2px 8px; border-radius: 6px; font-size: .72rem; font-weight: 600; }}
+.rtable {{ width:100%; border-collapse: collapse; font-size: .8rem; }}
+.rtable th {{ text-align:left; color: {C['ink2']}; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid {C['border']}; }}
+.rtable td {{ padding: 7px 8px; border-bottom: 1px solid {C['border']}; }}
+.scroll {{ max-height: 330px; overflow-y: auto; }}
+.footer {{ border-top: 1px solid {C['border']}; margin-top: 28px; padding-top: 14px; display:flex;
+    justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: .74rem; color: {C['ink2']}; }}
+/* ปรับสี widget ของ Streamlit (ธีมพื้นฐานเป็นสีแดง) ให้เป็นโทนน้ำเงินของ dashboard */
+[data-testid="stSlider"], [data-testid="stCheckbox"], [data-testid="stRadio"] [role="radiogroup"],
+[data-testid="stProgress"], [data-testid="stMultiSelect"] [data-baseweb="tag"] {{ filter: hue-rotate(217deg) saturate(1.1); }}
+[data-testid="stSlider"] [data-testid="stSliderThumbValue"] p {{ color: {C['ink']} !important; }}
+[data-testid="stButtonGroup"] button {{ background: {C['surface']} !important; color: {C['ink2']} !important;
+    border-color: {C['border']} !important; }}
+[data-testid="stButtonGroup"] button[aria-checked="true"], [data-testid="stButtonGroup"] button[data-selected="true"],
+[data-testid="stButtonGroup"] button[aria-pressed="true"] {{ background: {C['accent']} !important; color: #fff !important;
+    border-color: {C['accent']} !important; }}
+[data-testid="stButtonGroup"] button p {{ color: inherit !important; }}
+[data-baseweb="select"] > div, [data-baseweb="input"] > div, [data-baseweb="input"] input {{
+    background: {C['surface']} !important; color: {C['ink']} !important; border-color: {C['border']} !important; }}
+[data-testid="stExpander"] summary, [data-testid="stExpander"] p, [data-testid="stWidgetLabel"] p {{ color: {C['ink']}; }}
+.banner {{ border-radius: 12px; padding: 12px 16px; margin: 0 0 12px; font-size: .85rem; border: 1px solid; }}
+.banner.err {{ background: rgba(220,60,61,.12); border-color: rgba(220,60,61,.45); color: #f3b4b4; }}
+.banner.warn {{ background: rgba(251,179,21,.10); border-color: rgba(251,179,21,.40); color: #f6d58a; }}
+.banner b {{ color: {C['ink']}; }}
+/* ตาราง HTML: ลบเส้นขอบเริ่มต้นของ Streamlit */
+.rtable, .rtable tr, .rtable td, .rtable th {{ border-left: none !important; border-right: none !important;
+    border-top: none !important; background: transparent !important; }}
+.rtable thead th, .rtable th {{ position: sticky; top: 0; background: {C['surface']} !important; }}
+.stTabs [data-baseweb="tab"], .stTabs [data-baseweb="tab"] p {{ color: #c4c4c4 !important; }}
+.stTabs [aria-selected="true"], .stTabs [aria-selected="true"] p {{ color: {C['ink']} !important; }}
+.stTabs [data-baseweb="tab-highlight"] {{ background-color: {C['accent']} !important; }}
+</style>
+""", unsafe_allow_html=True)
 
 
-def cream_layout(fig, title="", height=380):
+def dark_layout(fig, title="", height=360, hover="x unified"):
     fig.update_layout(
-        title=dict(text=title, font=dict(color=FONT_COLOR, size=13), x=0.01),
-        paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
-        font=dict(color=FONT_COLOR, family="Inter, sans-serif"),
-        height=height, margin=dict(l=50, r=20, t=40, b=40),
-        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=LINE_COLOR, borderwidth=1, font=dict(size=11)),
-        xaxis=dict(gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR, showline=True, linecolor=LINE_COLOR),
-        yaxis=dict(gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR, showline=True, linecolor=LINE_COLOR),
+        title=dict(text=title, font=dict(color=C["ink"], size=13), x=0.0, xanchor="left") if title else None,
+        paper_bgcolor=C["surface"], plot_bgcolor=C["surface"],
+        font=dict(color=C["ink2"], family="IBM Plex Sans Thai, sans-serif", size=11),
+        height=height, margin=dict(l=56, r=18, t=44 if title else 16, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    bgcolor="rgba(0,0,0,0)", font=dict(color=C["ink2"], size=11)),
+        hovermode=hover,
+        hoverlabel=dict(bgcolor=C["raised"], bordercolor=C["axis"], font=dict(color=C["ink"], size=12)),
     )
+    fig.update_xaxes(gridcolor=C["grid"], zeroline=False, showline=True, linecolor=C["axis"],
+                     tickfont=dict(color=C["ink2"]), title_font=dict(color=C["ink2"]))
+    fig.update_yaxes(gridcolor=C["grid"], zeroline=False, showline=False,
+                     tickfont=dict(color=C["ink2"]), title_font=dict(color=C["ink2"]))
     return fig
 
 
-def card(value, label, color="#2c2c2c", sub=""):
-    sub_html = f'<div style="font-size:0.65rem;color:#a08060;">{sub}</div>' if sub else ""
-    return f"""
-    <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:8px;
-                padding:10px;margin-bottom:8px;text-align:center;">
-      <div style="font-size:1.4rem;font-weight:700;color:{color};">{value}</div>
-      <div style="font-size:0.72rem;color:#7a5c3a;">{label}</div>{sub_html}
-    </div>"""
+def tile(label, value, unit="", sub="", accent=None):
+    bar = f"border-top:3px solid {accent};" if accent else ""
+    u = f'<span class="unit">{unit}</span>' if unit else ""
+    s = f'<div class="sub">{sub}</div>' if sub else ""
+    return f'<div class="tile" style="{bar}"><div class="lab">{label}</div><div class="val">{value}{u}</div>{s}</div>'
+
+
+def badge(level):
+    col = RISK_COLOR.get(level, C["ink2"])
+    ink = "#0b0b0b" if level == "MODERATE" else "#ffffff"
+    return f'<span class="badge" style="background:{col};color:{ink};">{RISK_ICON.get(level, "")} {level}</span>'
+
+
+def panel(title, sub=""):
+    st.markdown(f'<div class="panel-h">{title}</div>' + (f'<div class="panel-s">{sub}</div>' if sub else ""),
+                unsafe_allow_html=True)
+
+
+def html_table(df, max_rows=300, height=360, fmt=None):
+    """ตาราง HTML ธีมมืด (st.dataframe ใช้สีธีมสว่างของ Streamlit)"""
+    fmt = fmt or {}
+    d = df.head(max_rows)
+    head = "".join(f"<th>{c}</th>" for c in d.columns)
+    body = ""
+    for _, r in d.iterrows():
+        cells = ""
+        for c in d.columns:
+            v = r[c]
+            if c in fmt:
+                v = fmt[c](v)
+            cells += f"<td>{v}</td>"
+        body += f"<tr>{cells}</tr>"
+    more = (f'<div style="font-size:.72rem;color:{C["ink2"]};margin-top:6px;">แสดง {len(d):,} จาก {len(df):,} แถว '
+            f'— ดาวน์โหลด CSV เพื่อดูทั้งหมด</div>') if len(df) > max_rows else ""
+    st.markdown(f'<div class="tile scroll" style="max-height:{height}px"><table class="rtable">'
+                f'<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>{more}', unsafe_allow_html=True)
+
+
+PLOT_CFG = {"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]}
+
+
+def show(fig):
+    st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
 
 
 # ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -466,130 +582,118 @@ NOW = now_th()
 TODAY = NOW.date()
 
 with st.sidebar:
-    st.markdown("### 🔬 Dashboard Controls")
-    st.markdown("---")
+    st.markdown(f'<div style="font-size:1.05rem;font-weight:700;">📡 ST001 Control</div>'
+                f'<div style="font-size:.75rem;color:{C["ink2"]};">ตั้งค่าการแสดงผลและการวิเคราะห์</div>',
+                unsafe_allow_html=True)
 
-    _start_default = DATA_START
-    date_range = st.date_input(
-        "📅 Date Range",
-        value=(_start_default, TODAY),
-        min_value=datetime(2025, 1, 1).date(),
-        max_value=TODAY,
-    )
-    if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-        start_date = pd.Timestamp(date_range[0])
-        end_date = pd.Timestamp(date_range[1])
-    else:
-        start_date, end_date = pd.Timestamp(_start_default), pd.Timestamp(TODAY)
-    # รวมข้อมูลทั้งวันสุดท้าย (เดิมตัดที่ 00:00 ทำให้ข้อมูลวันนี้หายไป)
-    end_ts = end_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-
+    st.markdown('<div class="side-h">ช่องวัดเรดอน</div>', unsafe_allow_html=True)
     channel = st.radio(
-        "🧪 ช่องวัดเรดอน",
-        list(CHANNELS.keys()),
-        format_func=lambda k: CHANNELS[k]["label"],
-        index=0,
-        help="ทุก Section วิเคราะห์ตามช่องที่เลือก ส่วน Section 1B แสดงทั้งสองช่องเทียบกัน",
+        "ช่องวัดเรดอน", list(CHANNELS.keys()),
+        format_func=lambda k: {"RADON_A": "ดิน · RADON_A", "RADON_B": "อากาศ · RADON_B"}[k],
+        index=0, label_visibility="collapsed",
+        help="ทุกแท็บวิเคราะห์ตามช่องที่เลือก ส่วนกราฟเทียบดินกับอากาศแสดงทั้งสองช่อง",
     )
     ch_label = CHANNELS[channel]["label"]
     ch_short = CHANNELS[channel]["short"]
+    ch_color = CHANNELS[channel]["color"]
 
-    mag_threshold = st.slider("⚡ Magnitude Threshold (Forecast)", 1.0, 10.0, 4.0, step=0.5)
-    radius_km = st.slider("📡 Radius (km)", 100, 1000, 1000, step=100)
-    days_ahead = st.slider("📆 Forecast Window (days)", 7, 60, 30)
+    st.markdown('<div class="side-h">ช่วงเวลา</div>', unsafe_allow_html=True)
+    quick = st.segmented_control("ช่วงด่วน", ["7 วัน", "30 วัน", "90 วัน", "ทั้งหมด", "กำหนดเอง"],
+                                 default="ทั้งหมด", label_visibility="collapsed") or "ทั้งหมด"
+    if quick == "กำหนดเอง":
+        date_range = st.date_input("ช่วงวันที่", value=(DATA_START, TODAY),
+                                   min_value=datetime(2025, 1, 1).date(), max_value=TODAY)
+        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+            start_date, end_date = pd.Timestamp(date_range[0]), pd.Timestamp(date_range[1])
+        else:
+            start_date, end_date = pd.Timestamp(DATA_START), pd.Timestamp(TODAY)
+    else:
+        back = {"7 วัน": 7, "30 วัน": 30, "90 วัน": 90}.get(quick)
+        end_date = pd.Timestamp(TODAY)
+        start_date = end_date - pd.Timedelta(days=back - 1) if back else pd.Timestamp(DATA_START)
+    end_ts = end_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    st.caption(f"{start_date:%d/%m/%Y} – {end_date:%d/%m/%Y}  ·  IQR ใช้หน้าต่าง 30 วัน")
 
-    st.markdown("---")
-    realtime = st.toggle("🔴 Auto-refresh", value=True)
-    refresh_sec = st.slider("Refresh every (sec)", 30, 600, 60, step=30, disabled=not realtime,
-                            help=f"ข้อมูลถูก cache ไว้ {CACHE_TTL // 60} นาที — รีเฟรชถี่กว่านี้จะไม่ได้ข้อมูลใหม่")
-    if st.button("🔄 ดึงข้อมูลใหม่ทันที (ล้าง cache)"):
+    st.markdown('<div class="side-h">เงื่อนไขแผ่นดินไหว</div>', unsafe_allow_html=True)
+    mag_threshold = st.slider("ขนาดขั้นต่ำ (M)", 1.0, 10.0, 4.0, step=0.5)
+    radius_km = st.slider("รัศมีจากสถานี (km)", 100, 1000, 1000, step=100)
+    days_ahead = st.slider("หน้าต่างพยากรณ์ (วัน)", 7, 60, 30)
+
+    st.markdown('<div class="side-h">การอัปเดต</div>', unsafe_allow_html=True)
+    realtime = st.toggle("รีเฟรชอัตโนมัติ", value=True)
+    refresh_sec = st.select_slider("ทุก ๆ", options=[60, 120, 300, 600], value=300,
+                                   format_func=lambda s: f"{s // 60} นาที", disabled=not realtime)
+    if st.button("🔄 ดึงข้อมูลใหม่ทันที", width="stretch"):
         st.cache_data.clear()
         st.rerun()
-
-    st.markdown("---")
-    station_box = st.container()
+    side_status = st.container()
 
 # ─── Load data ───────────────────────────────────────────────────────────────
-with st.spinner("🔄 กำลังดึงข้อมูลจาก Google Sheets..."):
+with st.spinner("กำลังดึงข้อมูลจาก Google Sheets..."):
     radon_raw, radon_info = load_radon_raw()
     eq_full, eq_info = load_eq_data()
 
 STATION = radon_info.get("station") or STATION_DEFAULT
-with station_box:
-    st.markdown("**📍 Station Info**")
-    st.markdown(f"{STATION_NAME}")
-    st.markdown(f"Lat: **{STATION[0]}°N** &nbsp; Lon: **{STATION[1]}°E**")
-
 radon_full = prepare_radon(radon_raw, channel)
 latest_radon_ts = radon_info.get("latest_raw")
 if latest_radon_ts is None or pd.isna(latest_radon_ts):
     latest_radon_ts = radon_full.index.max() if len(radon_full) else None
 latest_eq_ts = eq_full["Time (Thailand)"].max() if len(eq_full) else None
 age_h, fresh_label, fresh_color = freshness(latest_radon_ts, NOW)
+fresh_color = {"🟢": C["good"], "🟡": C["warning"], "🔴": C["critical"]}.get(fresh_label[0], C["ink2"])
 eq_age_h, eq_fresh_label, _ = freshness(latest_eq_ts, NOW)
 
-# ── สถานะข้อมูลใน sidebar ──
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("**📡 สถานะข้อมูล**")
+with side_status:
+    st.markdown('<div class="side-h">สถานะข้อมูล</div>', unsafe_allow_html=True)
     if radon_info["is_mock"]:
-        st.markdown("Radon: 🟡 **Mock Data** (เชื่อม Sheet ไม่ได้)")
+        st.markdown(f'<span class="dot" style="background:{C["warning"]}"></span> Radon: <b>ข้อมูลจำลอง</b>',
+                    unsafe_allow_html=True)
     else:
-        st.markdown(f"Radon: {fresh_label}")
-        st.markdown(f"ล่าสุด **{latest_radon_ts:%d/%m/%Y %H:%M}** (ผ่านมา {fmt_age(age_h)})")
-        for tab, t in radon_info["tabs"].items():
-            lt = f"{t['latest']:%d/%m/%Y %H:%M}" if t["latest"] is not None else "-"
-            st.markdown(f"<small>• แท็บ {tab}: {t['rows']:,} แถว (ทุก 5 นาที) | ล่าสุด {lt}</small>", unsafe_allow_html=True)
+        st.markdown(f'<span class="dot" style="background:{fresh_color}"></span> Radon: {fresh_label[2:]}<br>'
+                    f'<small style="color:{C["ink2"]}">ล่าสุด {latest_radon_ts:%d/%m/%Y %H:%M} · '
+                    f'ผ่านมา {fmt_age(age_h)}</small>', unsafe_allow_html=True)
     if eq_info["is_mock"]:
-        st.markdown("EQ: 🟡 **Mock Data**")
+        st.markdown(f'<span class="dot" style="background:{C["warning"]}"></span> EQ: <b>ข้อมูลจำลอง</b>',
+                    unsafe_allow_html=True)
     else:
-        st.markdown(f"EQ: {eq_fresh_label} — ล่าสุด {latest_eq_ts:%d/%m/%Y %H:%M}")
-    st.markdown(f"<small>Radon {channel} {len(radon_full):,} ชั่วโมง | EQ {len(eq_full):,} แถว<br>"
-                f"ดึงข้อมูลเมื่อ {radon_info['fetched_at']:%H:%M:%S}</small>", unsafe_allow_html=True)
+        st.markdown(f'<span class="dot" style="background:{C["good"]}"></span> EQ: {len(eq_full):,} เหตุการณ์<br>'
+                    f'<small style="color:{C["ink2"]}">ล่าสุด {latest_eq_ts:%d/%m/%Y %H:%M}</small>',
+                    unsafe_allow_html=True)
+    st.markdown(f'<small style="color:{C["ink2"]}">📍 {STATION[0]}°N, {STATION[1]}°E<br>'
+                f'ดึงข้อมูลเมื่อ {radon_info["fetched_at"]:%H:%M:%S}</small>', unsafe_allow_html=True)
 
-# ── คำเตือนหลัก ──
-if radon_info["is_mock"]:
-    st.error("⚠️ ไม่สามารถดึงข้อมูลเรดอนจริงได้ — กราฟทั้งหมดด้านล่างเป็น **ข้อมูลจำลอง (Mock)**  \n"
-             + "  \n".join(radon_info["errors"]))
-elif age_h is not None and age_h > FRESH_WARN_H:
-    st.error(f"⚠️ ข้อมูลเรดอนไม่ได้อัปเดตมา **{fmt_age(age_h)}** "
-             f"(ค่าล่าสุด {latest_radon_ts:%d/%m/%Y %H:%M} น.) — โปรดตรวจสอบเครื่องวัด/สคริปต์ส่งข้อมูล")
-elif radon_info["errors"]:
-    st.warning("⚠️ อ่านบางแท็บไม่สำเร็จ: " + " | ".join(radon_info["errors"]))
-if eq_info["is_mock"]:
-    st.warning(f"⚠️ ไม่สามารถดึงข้อมูลแผ่นดินไหวได้ ({eq_info['error']}) → ใช้ Mock Data แทน")
-
-# ─── Filter ──────────────────────────────────────────────────────────────────
+# ─── Filter & analysis ───────────────────────────────────────────────────────
 radon = radon_full.loc[start_date:end_ts].copy()
-eq_sel = eq_full[(eq_full["Time (Thailand)"] >= start_date) &
-                 (eq_full["Time (Thailand)"] <= end_ts)].copy()
-eq_sel["distance_km"] = haversine_km(STATION[0], STATION[1],
-                                     eq_sel["Latitude"].values, eq_sel["Longitude"].values)
+eq_sel = eq_full[(eq_full["Time (Thailand)"] >= start_date) & (eq_full["Time (Thailand)"] <= end_ts)].copy()
+eq_sel["distance_km"] = haversine_km(STATION[0], STATION[1], eq_sel["Latitude"].values, eq_sel["Longitude"].values)
 eq_near = eq_sel[eq_sel["distance_km"] <= radius_km].copy()
+eq_big = eq_near[eq_near["Magnitude"] >= mag_threshold].sort_values("Time (Thailand)")
 
+# Rolling IQR ต้องใช้ข้อมูลย้อนหลัง 30 วันก่อนช่วงที่เลือก (ไม่อย่างนั้นช่วงสั้น ๆ จะไม่มีเส้นขอบบน)
+radon_ctx = radon_full.loc[start_date - pd.Timedelta(days=30):end_ts]
 if radon.empty:
-    st.info("ไม่มีข้อมูลเรดอนในช่วงวันที่ที่เลือก — ลองขยายช่วงวันที่ใน sidebar")
+    st.info("ไม่มีข้อมูลเรดอนในช่วงวันที่ที่เลือก — ลองเลือกช่วงเวลาที่กว้างขึ้นใน sidebar")
     st.stop()
+Q1, Q3, IQR, upper, _anom_ctx, _upper_ctx = compute_rolling_iqr_anomaly(radon_ctx, window_days=30)
+radon_anom = _anom_ctx.loc[start_date:end_ts]
+upper_rolling = _upper_ctx.loc[start_date:end_ts]
+Q1, Q3 = radon.quantile(0.25), radon.quantile(0.75)
+IQR = Q3 - Q1
+upper = Q3 + 1.5 * IQR
 
-Q1, Q3, IQR, upper, radon_anom, upper_rolling = compute_rolling_iqr_anomaly(radon, window_days=30)
-
-# ─── Survival data (1,000 anomaly ล่าสุด) ─────────────────────────────────────
+# Survival data (1,000 anomaly ล่าสุด)
 sample_anom = radon_anom.iloc[-1000:]
 min_mag_list = [3.0, 4.0, 5.0]
-eq_times = eq_near["Time (Thailand)"]
-eq_mags = eq_near["Magnitude"]
+eq_times, eq_mags = eq_near["Time (Thailand)"], eq_near["Magnitude"]
 rows = []
 for t, v in sample_anom.items():
-    row = {"Anomaly_Time": t, "Bq/m³": float(v)}
+    row = {"Anomaly_Time": t, "value": float(v)}
     for m in min_mag_list:
         k = str(m).replace(".", "")
         row[f"dt_M{k}"], row[f"ev_M{k}"] = time_to_first_eq(t, eq_times, eq_mags, days_ahead, m)
     rows.append(row)
-if rows:
-    dt_df = pd.DataFrame(rows).set_index("Anomaly_Time")
-else:
-    dt_df = pd.DataFrame(columns=["Bq/m³", "dt_M30", "ev_M30", "dt_M40", "ev_M40", "dt_M50", "ev_M50"])
-
+dt_df = (pd.DataFrame(rows).set_index("Anomaly_Time") if rows else
+         pd.DataFrame(columns=["value", "dt_M30", "ev_M30", "dt_M40", "ev_M40", "dt_M50", "ev_M50"]))
 T3, E3 = dt_df["dt_M30"], dt_df["ev_M30"]
 T4, E4 = dt_df["dt_M40"], dt_df["ev_M40"]
 T5, E5 = dt_df["dt_M50"], dt_df["ev_M50"]
@@ -609,506 +713,460 @@ has_haz = haz_df["hazard"].notna().any()
 peak_haz = float(haz_df["hazard"].max()) if has_haz else 0.0
 peak_day = int(haz_df.loc[haz_df["hazard"].idxmax(), "day"]) if has_haz else 0
 n_high = int(haz_df["risk_level"].isin(["HIGH", "VERY HIGH"]).sum())
+latest_anom_val = float(radon_anom.iloc[-1]) if len(radon_anom) else 0.0
 
-# ─── Header ──────────────────────────────────────────────────────────────────
+# ความเสี่ยง "วันนี้" = hazard ของวันที่ตรงกับจำนวนวันนับจาก anomaly ล่าสุด
+days_since = (pd.Timestamp(NOW).normalize() - pd.Timestamp(anchor).normalize()).days + 1
+today_row = haz_df[haz_df["day"] == days_since]
+if len(radon_anom) and len(today_row):
+    today_haz = float(today_row["hazard"].iloc[0]) if pd.notna(today_row["hazard"].iloc[0]) else 0.0
+    today_level = risk_level(today_haz)
+    today_sub = f"วันที่ {days_since} หลัง anomaly ล่าสุด · hazard {today_haz:.3f}"
+else:
+    today_haz, today_level = 0.0, "LOW"
+    today_sub = (f"ไม่มี anomaly ภายใน {days_ahead} วันที่ผ่านมา" if len(radon_anom)
+                 else "ยังไม่พบ anomaly ในช่วงที่เลือก")
+
+# ─── Top bar ─────────────────────────────────────────────────────────────────
 if radon_info["is_mock"]:
-    live_txt, live_col = "MOCK", "#c8860a"
+    live_txt, live_col = "MOCK", C["warning"]
 else:
     live_txt = {"🟢": "LIVE", "🟡": "DELAYED", "🔴": "STALE"}.get(fresh_label[0], "LIVE")
     live_col = fresh_color
 latest_txt = f"{latest_radon_ts:%d/%m/%Y %H:%M}" if latest_radon_ts is not None else "-"
 
 st.markdown(f"""
-<div style="background:#fff8f0;border:1px solid #d4b896;border-radius:12px;padding:14px 24px;
-            margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+<div class="topbar">
   <div>
-    <span style="font-size:1.4rem;font-weight:700;color:#1a6fbf;">🔬 Radon & Earthquake Hazard Dashboard — Station 1</span>
-    <span style="margin-left:14px;font-size:0.78rem;color:#7a5c3a;">
-      {STATION_NAME} ({STATION[0]}°N, {STATION[1]}°E) &nbsp;|&nbsp; {ch_label} &nbsp;|&nbsp; Radius: {radius_km} km
-    </span>
+    <div class="t1">Radon Precursor Monitor <span style="color:{C['ink2']};font-weight:400;">· {STATION_NAME}</span></div>
+    <div class="t2">iRES-MCM · RMUTI &nbsp;|&nbsp; {STATION[0]}°N, {STATION[1]}°E &nbsp;|&nbsp;
+      แผ่นดินไหว M≥{mag_threshold} ภายใน {radius_km} km</div>
   </div>
-  <div style="text-align:right;font-size:0.78rem;color:#7a5c3a;">
-    <span class="live-dot" style="background:{live_col};"></span>
-    <b style="color:{live_col};">{live_txt}</b> &nbsp;ข้อมูลล่าสุด {latest_txt}
-    (ผ่านมา {fmt_age(age_h)})<br>เวลาขณะนี้ {NOW:%d/%m/%Y %H:%M:%S}
+  <div>
+    <span class="pill"><span class="dot" style="background:{ch_color}"></span>{ch_label}</span>
+    <span class="pill"><span class="dot live" style="background:{live_col}"></span><b style="color:{live_col}">{live_txt}</b>
+      &nbsp;<span class="mono">{latest_txt}</span></span>
+    <span class="pill mono">🕒 {NOW:%d/%m/%Y %H:%M}</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ─── KPI Row ─────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
-latest_anom_val = float(radon_anom.iloc[-1]) if len(radon_anom) else 0.0
-eq_count = int((eq_near["Magnitude"] >= mag_threshold).sum())
-c1.metric("🌫️ Latest Radon", f"{radon.iloc[-1]:.2f} Bq/m³", f"{radon.index[-1]:%d/%m %H:%M}", delta_color="off")
-c2.metric("⚠️ Total Anomalies", f"{len(radon_anom):,}", f"Global IQR upper: {upper:.2f}", delta_color="off")
-c3.metric("🌍 EQ Events Nearby", f"{eq_count}", f"M≥{mag_threshold}, R≤{radius_km}km", delta_color="off")
-c4.metric("📈 Peak Hazard Day", f"Day {peak_day}", f"Max: {peak_haz:.3f}", delta_color="off")
-c5.metric("🚨 High Risk Days", f"{n_high} days", f"in next {days_ahead} days", delta_color="off")
-st.markdown("<br>", unsafe_allow_html=True)
+def banner(kind, html):
+    st.markdown(f'<div class="banner {kind}">{html}</div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 1 — Radon Time Series
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">📊 Section 1 — Radon Time Series & IQR Anomaly Detection</div>',
+
+if radon_info["is_mock"]:
+    banner("err", "⚠️ <b>ไม่สามารถดึงข้อมูลเรดอนจริงได้</b> — ตัวเลขและกราฟทั้งหมดเป็นข้อมูลจำลอง<br>"
+           + "<br>".join(radon_info["errors"]))
+elif age_h is not None and age_h > FRESH_WARN_H:
+    banner("err", f"⚠️ <b>ข้อมูลเรดอนไม่ได้อัปเดตมา {fmt_age(age_h)}</b> (ค่าล่าสุด {latest_txt} น.) — "
+           "โปรดตรวจสอบเครื่องวัดหรือการส่งข้อมูล")
+if eq_info["is_mock"]:
+    banner("warn", f"⚠️ <b>ดึงข้อมูลแผ่นดินไหวไม่ได้</b> — ใช้ข้อมูลจำลองแทน ({eq_info['error']})")
+
+# ─── Status strip ────────────────────────────────────────────────────────────
+rc = RISK_COLOR[today_level]
+hero_ink = "#0b0b0b" if today_level == "MODERATE" else "#ffffff"
+last_val = float(radon.iloc[-1])
+med30 = float(radon_full.loc[radon.index[-1] - pd.Timedelta(days=30):].median())
+delta_pct = (last_val / med30 - 1) * 100 if med30 else 0.0
+anom_7d = int((radon_anom.index >= radon.index[-1] - pd.Timedelta(days=7)).sum())
+last_upper = upper_rolling.dropna().iloc[-1] if upper_rolling.notna().any() else np.nan
+eq_30d = eq_big[eq_big["Time (Thailand)"] >= pd.Timestamp(NOW) - pd.Timedelta(days=30)]
+fmt_v = (lambda v: f"{v:,.0f}") if channel == "RADON_A" else (lambda v: f"{v:,.1f}")
+
+h, k1, k2, k3, k4 = st.columns([1.35, 1, 1, 1, 1])
+h.markdown(f"""
+<div class="hero" style="background:{rc};color:{hero_ink};">
+  <div class="lab">ความเสี่ยงวันนี้ (M≥{_snap})</div>
+  <div class="val">{RISK_ICON[today_level]} {today_level}</div>
+  <div class="sub">ระดับ{RISK_TH[today_level]} · {today_sub}</div>
+</div>""", unsafe_allow_html=True)
+k1.markdown(tile(f"ค่าล่าสุด · {ch_short}", fmt_v(last_val), UNIT,
+                 f"{'▲' if delta_pct >= 0 else '▼'} {abs(delta_pct):.0f}% เทียบมัธยฐาน 30 วัน", ch_color),
             unsafe_allow_html=True)
-
-step = max(1, len(radon) // 2000)
-radon_plot = radon.iloc[::step]
-fig1 = go.Figure()
-fig1.add_trace(go.Scatter(x=radon_plot.index, y=radon_plot.values, mode="lines", name=f"{ch_short} ({UNIT})",
-                          line=dict(color=CHANNELS[channel]["color"], width=1.2), opacity=0.85))
-fig1.add_trace(go.Scatter(x=radon_anom.index, y=radon_anom.values, mode="markers", name="Anomaly",
-                          marker=dict(color="#ff7b72", size=6)))
-upper_r = upper_rolling.dropna()
-if len(upper_r):
-    step_r = max(1, len(upper_r) // 500)
-    fig1.add_trace(go.Scatter(x=upper_r.iloc[::step_r].index, y=upper_r.iloc[::step_r].values,
-                              mode="lines", name="Rolling IQR Upper (30d)",
-                              line=dict(color="#e3b341", width=1.2, dash="dot"), opacity=0.8))
-fig1.add_hline(y=float(upper), line_dash="dash", line_color="#f0883e",
-               annotation_text=f"Global IQR Upper = {upper:.2f}", annotation_font_color="#f0883e")
-fig1.add_hline(y=float(Q3), line_dash="dot", line_color="#3fb950",
-               annotation_text=f"Q3={Q3:.2f}", annotation_font_color="#3fb950")
-if latest_radon_ts is not None and start_date <= latest_radon_ts <= end_ts:
-    fig1.add_vline(x=latest_radon_ts, line_dash="dot", line_color="#7a5c3a")
-cream_layout(fig1, f"{ch_label} — hourly median — {len(radon_anom)} anomalies detected", height=300)
-st.plotly_chart(fig1, width="stretch")
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 1B — Soil vs Air
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">🌱🌬️ Section 1B — เรดอนในดิน (RADON_A) vs เรดอนในอากาศ (RADON_B)</div>',
+k2.markdown(tile("Anomaly 7 วันล่าสุด", f"{anom_7d:,}", "ชม.",
+                 f"ขอบบน IQR ล่าสุด {fmt_v(last_upper) if pd.notna(last_upper) else '-'} {UNIT}"),
             unsafe_allow_html=True)
-both = radon_raw.loc[start_date:end_ts, ["RADON_A", "RADON_B"]]
-col1b, col1b_stats = st.columns([3, 1])
-with col1b:
-    st_b = max(1, len(both) // 2000)
-    both_p = both.iloc[::st_b]
-    fig1b = make_subplots(specs=[[{"secondary_y": True}]])
-    fig1b.add_trace(go.Scatter(x=both_p.index, y=both_p["RADON_A"], mode="lines", name="Soil — RADON_A",
-                               line=dict(color=CHANNELS["RADON_A"]["color"], width=1.1)), secondary_y=False)
-    fig1b.add_trace(go.Scatter(x=both_p.index, y=both_p["RADON_B"], mode="lines", name="Air — RADON_B",
-                               line=dict(color=CHANNELS["RADON_B"]["color"], width=1.1), opacity=0.85),
-                    secondary_y=True)
-    cream_layout(fig1b, "Hourly median — แกนซ้าย: ดิน, แกนขวา: อากาศ", height=300)
-    fig1b.update_yaxes(title_text=f"Soil ({UNIT})", secondary_y=False, gridcolor=GRID_COLOR, color=FONT_COLOR)
-    fig1b.update_yaxes(title_text=f"Air ({UNIT})", secondary_y=True, showgrid=False, color=FONT_COLOR)
-    st.plotly_chart(fig1b, width="stretch")
-with col1b_stats:
-    pair = both.dropna()
-    if len(pair) > 10:
-        r_p = pair["RADON_A"].corr(pair["RADON_B"])
-        r_s = pair["RADON_A"].corr(pair["RADON_B"], method="spearman")
-        ratio = (pair["RADON_A"] / pair["RADON_B"]).median()
-    else:
-        r_p = r_s = ratio = np.nan
-    fmt = lambda v, f: "-" if pd.isna(v) else format(v, f)
-    st.markdown(card(fmt(both["RADON_A"].median(), ",.0f"), f"มัธยฐานดิน ({UNIT})", CHANNELS["RADON_A"]["color"]),
-                unsafe_allow_html=True)
-    st.markdown(card(fmt(both["RADON_B"].median(), ",.1f"), f"มัธยฐานอากาศ ({UNIT})", CHANNELS["RADON_B"]["color"]),
-                unsafe_allow_html=True)
-    st.markdown(card(fmt(ratio, ",.1f") + "×", "อัตราส่วน ดิน/อากาศ (มัธยฐาน)"), unsafe_allow_html=True)
-    st.markdown(card(fmt(r_p, ".3f"), "Pearson r (รายชั่วโมง)", sub=f"Spearman ρ = {fmt(r_s, '.3f')}"),
-                unsafe_allow_html=True)
+k3.markdown(tile(f"แผ่นดินไหว M≥{mag_threshold} · 30 วัน", f"{len(eq_30d):,}", "ครั้ง",
+                 f"ทั้งช่วงที่เลือก {len(eq_big):,} ครั้ง · R≤{radius_km} km"), unsafe_allow_html=True)
+k4.markdown(tile("วันที่ hazard สูงสุด", f"Day {peak_day}", "",
+                 f"hazard {peak_haz:.3f} · วันเสี่ยงสูง {n_high}/{days_ahead}"), unsafe_allow_html=True)
+st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Earthquake Map
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">🗺️ Section 2 — Earthquake Map</div>', unsafe_allow_html=True)
-col_map, col_eq_stats = st.columns([3, 1])
+# ─── Tabs ────────────────────────────────────────────────────────────────────
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📡 เรดอน", "🌏 แผ่นดินไหว", "🚨 พยากรณ์ความเสี่ยง",
+                                        "📈 สถิติ Precursor", "✅ ตรวจสอบย้อนหลัง"])
 
-with col_map:
-    eq_map = eq_near.copy()
-    eq_map["mag_size"] = ((eq_map["Magnitude"] - 2) * 5).clip(3, 25)
-    eq_map["label"] = (
-        "M" + eq_map["Magnitude"].round(1).astype(str) + " | "
-        + eq_map["Time (Thailand)"].dt.strftime("%Y-%m-%d")
-        + "<br>Dist: " + eq_map["distance_km"].round(0).astype(int).astype(str) + " km"
-    )
-    fig_map = go.Figure()
-    fig_map.add_trace(go.Scattergeo(
-        lat=eq_map["Latitude"], lon=eq_map["Longitude"], mode="markers",
-        marker=dict(size=eq_map["mag_size"], color=eq_map["Magnitude"],
-                    colorscale=[[0, "#3fb950"], [0.4, "#e3b341"], [0.7, "#f0883e"], [1, "#ff7b72"]],
-                    colorbar=dict(title="Mag", thickness=10, len=0.6), opacity=0.75, line=dict(width=0)),
-        text=eq_map["label"], hoverinfo="text", name="Earthquakes"))
-    fig_map.add_trace(go.Scattergeo(
-        lat=[STATION[0]], lon=[STATION[1]], mode="markers+text",
-        marker=dict(size=14, color="#c0392b", symbol="star"),
-        text=["📡 Station"], textposition="top center", textfont=dict(color="#c0392b", size=11),
-        name="Radon Station", hoverinfo="name"))
-    fig_map.update_geos(
-        center=dict(lat=STATION[0], lon=STATION[1]), projection_scale=4,
-        showland=True, landcolor="#f5ead8", showocean=True, oceancolor="#dbe9f4",
-        showcoastlines=True, coastlinecolor=LINE_COLOR, showframe=False,
-        showcountries=True, countrycolor=LINE_COLOR, bgcolor=PLOT_BG)
-    fig_map.update_layout(
-        paper_bgcolor=PLOT_BG, font=dict(color=FONT_COLOR), height=380,
-        margin=dict(l=0, r=0, t=30, b=0), legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
-        title=dict(text=f"EQ locations within {radius_km} km (N={len(eq_near)})",
-                   font=dict(color=FONT_COLOR, size=12), x=0.01))
-    st.plotly_chart(fig_map, width="stretch")
+# ══ TAB 1 — Radon ══════════════════════════════════════════════════════════
+with tab1:
+    panel(f"{ch_label} — ค่ามัธยฐานรายชั่วโมง",
+          f"Anomaly = ค่าที่สูงกว่าขอบบน Rolling IQR (Q3 + 1.5·IQR จากค่ามัธยฐานรายวันย้อนหลัง 30 วัน) · "
+          f"พบ {len(radon_anom):,} ชั่วโมงในช่วงที่เลือก")
+    step = max(1, len(radon) // 3000)
+    rp = radon.iloc[::step]
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=rp.index, y=rp.values, mode="lines", name=ch_short,
+                              line=dict(color=ch_color, width=1.4),
+                              hovertemplate="%{y:,.1f} " + UNIT + "<extra>" + ch_short + "</extra>"))
+    ur = upper_rolling.dropna()
+    if len(ur):
+        urp = ur.iloc[::max(1, len(ur) // 1000)]
+        fig1.add_trace(go.Scatter(x=urp.index, y=urp.values, mode="lines", name="ขอบบน Rolling IQR",
+                                  line=dict(color=C["upper"], width=1.4, dash="dot"),
+                                  hovertemplate="%{y:,.1f}<extra>ขอบบน IQR</extra>"))
+    fig1.add_trace(go.Scatter(x=radon_anom.index, y=radon_anom.values, mode="markers", name="Anomaly",
+                              marker=dict(color=C["critical"], size=8, symbol="diamond",
+                                          line=dict(color=C["surface"], width=2)),
+                              hovertemplate="%{y:,.1f}<extra>Anomaly</extra>"))
+    dark_layout(fig1, height=380)
+    fig1.update_yaxes(title_text=UNIT)
+    fig1.update_xaxes(rangeslider=dict(visible=True, bgcolor=C["page"], thickness=0.06))
+    show(fig1)
 
-with col_eq_stats:
-    st.markdown("**📊 EQ Stats**")
-    for m, color in [(3.0, "#2e8b57"), (4.0, "#c8860a"), (5.0, "#c05000"), (6.0, "#c0392b")]:
-        st.markdown(card(int((eq_near["Magnitude"] >= m).sum()), f"M ≥ {m}", color), unsafe_allow_html=True)
-    max_mag = eq_near["Magnitude"].max() if len(eq_near) else 0
-    st.markdown(card(f"{max_mag:.1f}", "Max Magnitude", "#c0392b"), unsafe_allow_html=True)
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    panel("เรดอนในดิน vs เรดอนในอากาศ", "สองช่องมีสเกลต่างกันหลายสิบเท่า จึงแยกกราฟแต่ใช้แกนเวลาเดียวกัน")
+    both = radon_raw.loc[start_date:end_ts, ["RADON_A", "RADON_B"]]
+    cA, cB = st.columns([3, 1])
+    with cA:
+        bp = both.iloc[::max(1, len(both) // 2500)]
+        fig1b = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+                              subplot_titles=("ดิน · RADON_A", "อากาศ · RADON_B"))
+        fig1b.add_trace(go.Scatter(x=bp.index, y=bp["RADON_A"], mode="lines", name="ดิน · RADON_A",
+                                   line=dict(color=C["soil"], width=1.3)), row=1, col=1)
+        fig1b.add_trace(go.Scatter(x=bp.index, y=bp["RADON_B"], mode="lines", name="อากาศ · RADON_B",
+                                   line=dict(color=C["air"], width=1.3)), row=2, col=1)
+        dark_layout(fig1b, height=420)
+        fig1b.update_layout(showlegend=False)
+        fig1b.update_annotations(font=dict(color=C["ink2"], size=12), x=0, xanchor="left")
+        fig1b.update_yaxes(title_text=UNIT)
+        show(fig1b)
+    with cB:
+        pair = both.dropna()
+        if len(pair) > 10:
+            r_p = pair["RADON_A"].corr(pair["RADON_B"])
+            r_s = pair["RADON_A"].corr(pair["RADON_B"], method="spearman")
+            ratio = (pair["RADON_A"] / pair["RADON_B"]).median()
+        else:
+            r_p = r_s = ratio = np.nan
+        f_ = lambda v, f: "-" if pd.isna(v) else format(v, f)
+        st.markdown(tile("มัธยฐาน · ดิน", f_(both["RADON_A"].median(), ",.0f"), UNIT, accent=C["soil"]),
+                    unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown(tile("มัธยฐาน · อากาศ", f_(both["RADON_B"].median(), ",.1f"), UNIT, accent=C["air"]),
+                    unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown(tile("อัตราส่วน ดิน/อากาศ", f_(ratio, ",.1f"), "เท่า", "มัธยฐานรายชั่วโมง"),
+                    unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown(tile("Pearson r", f_(r_p, ".3f"), "", f"Spearman ρ = {f_(r_s, '.3f')}"),
+                    unsafe_allow_html=True)
 
-    # สัดส่วน EQ (M≥threshold) ที่มี anomaly เกิดก่อนภายใน 30 วัน
-    eq_big = eq_near[eq_near["Magnitude"] >= mag_threshold]
-    if len(eq_big) and len(radon_anom):
-        anom_idx = radon_anom.index.values
-        pos = np.searchsorted(anom_idx, eq_big["Time (Thailand)"].values, side="left")
-        prev_anom = np.where(pos > 0, anom_idx[np.maximum(pos - 1, 0)], np.datetime64("NaT"))
-        gap = (eq_big["Time (Thailand)"].values - prev_anom) / np.timedelta64(1, "D")
-        detect_pct = float(np.mean((pos > 0) & (gap <= 30)) * 100)
-    else:
-        detect_pct = 0.0
-    detect_color = "#2e8b57" if detect_pct >= 60 else "#c8860a" if detect_pct >= 30 else "#c0392b"
-    st.markdown(card(f"{detect_pct:.1f}%", "🎯 จับสัญญาณ EQ ได้", detect_color,
-                     f"EQ M≥{mag_threshold} ที่มี Anomaly ก่อนหน้า ≤30 วัน"), unsafe_allow_html=True)
+# ══ TAB 2 — Earthquakes ════════════════════════════════════════════════════
+with tab2:
+    cm, cs = st.columns([3, 1])
+    with cm:
+        panel(f"ตำแหน่งแผ่นดินไหวภายใน {radius_km} km", f"{len(eq_near):,} เหตุการณ์ · ขนาดจุดตามขนาดแผ่นดินไหว")
+        em = eq_near.copy()
+        em["sz"] = ((em["Magnitude"] - 1.5) * 4).clip(4, 26)
+        region_col = next((c for c in em.columns if "region" in c.lower() or "พื้นที่" in c.lower()), None)
+        em["txt"] = ("M" + em["Magnitude"].round(1).astype(str) + " · " + em["Time (Thailand)"].dt.strftime("%d/%m/%Y %H:%M")
+                     + "<br>" + em["distance_km"].round(0).astype(int).astype(str) + " km จากสถานี"
+                     + (("<br>" + em[region_col].astype(str).str[:40]) if region_col else ""))
+        fig_map = go.Figure()
+        for lab, lo, hi, col in [("M<3", 0, 3, "#5f5f5f"), ("3≤M<4", 3, 4, MAG_COLOR[3.0]),
+                                 ("4≤M<5", 4, 5, MAG_COLOR[4.0]), ("M≥5", 5, 99, MAG_COLOR[5.0])]:
+            sub = em[(em["Magnitude"] >= lo) & (em["Magnitude"] < hi)]
+            if len(sub):
+                fig_map.add_trace(go.Scattermap(
+                    lat=sub["Latitude"], lon=sub["Longitude"], mode="markers", name=lab,
+                    marker=dict(size=sub["sz"], color=col, opacity=0.8),
+                    text=sub["txt"], hovertemplate="%{text}<extra></extra>"))
+        fig_map.add_trace(go.Scattermap(lat=[STATION[0]], lon=[STATION[1]], mode="markers+text",
+                                        name="สถานี ST001", text=["ST001"], textposition="top right",
+                                        textfont=dict(color=C["ink"], size=12),
+                                        marker=dict(size=16, color=C["accent"]),
+                                        hovertemplate="สถานี ST001<extra></extra>"))
+        zoom = 6.2 if radius_km <= 200 else 5.2 if radius_km <= 400 else 4.3 if radius_km <= 700 else 3.8
+        fig_map.update_layout(map=dict(style="carto-darkmatter", center=dict(lat=STATION[0], lon=STATION[1]), zoom=zoom),
+                              paper_bgcolor=C["surface"], height=470, margin=dict(l=0, r=0, t=0, b=0),
+                              legend=dict(bgcolor="rgba(25,25,25,0.85)", font=dict(color=C["ink"]), x=0.01, y=0.99),
+                              hoverlabel=dict(bgcolor=C["raised"], font=dict(color=C["ink"])))
+        show(fig_map)
+    with cs:
+        panel("สรุป", f"รัศมี {radius_km} km")
+        for m in [3.0, 4.0, 5.0, 6.0]:
+            st.markdown(tile(f"M ≥ {m}", f"{int((eq_near['Magnitude'] >= m).sum()):,}", "ครั้ง"), unsafe_allow_html=True)
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        if len(eq_big) and len(radon_anom):
+            ai = radon_anom.index.values
+            pos = np.searchsorted(ai, eq_big["Time (Thailand)"].values, side="left")
+            prev = np.where(pos > 0, ai[np.maximum(pos - 1, 0)], np.datetime64("NaT"))
+            gap = (eq_big["Time (Thailand)"].values - prev) / np.timedelta64(1, "D")
+            detect_pct = float(np.mean((pos > 0) & (gap <= 30)) * 100)
+        else:
+            detect_pct = 0.0
+        st.markdown(tile("จับสัญญาณล่วงหน้าได้", f"{detect_pct:.1f}", "%",
+                         f"EQ M≥{mag_threshold} ที่มี anomaly ก่อนหน้า ≤30 วัน", C["accent"]), unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 3 & 4 — Precursor + Survival
-# ═══════════════════════════════════════════════════════════════════════════
-col3, col4 = st.columns(2)
+    panel("ไทม์ไลน์: Anomaly เรดอน กับ แผ่นดินไหว", "แกนเวลาเดียวกัน — ดูว่าแผ่นดินไหวเกิดตามหลังช่วงที่มี anomaly หรือไม่")
+    fig6 = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.6, 0.4])
+    rd = radon.iloc[::max(1, len(radon) // 2000)]
+    fig6.add_trace(go.Scatter(x=rd.index, y=rd.values, mode="lines", name=ch_short,
+                              line=dict(color=ch_color, width=1.2)), row=1, col=1)
+    fig6.add_trace(go.Scatter(x=radon_anom.index, y=radon_anom.values, mode="markers", name="Anomaly",
+                              marker=dict(color=C["critical"], size=7, symbol="diamond")), row=1, col=1)
+    fig6.add_trace(go.Scatter(x=eq_big["Time (Thailand)"], y=eq_big["Magnitude"], mode="markers",
+                              name=f"แผ่นดินไหว M≥{mag_threshold}",
+                              marker=dict(color=C["eq"], size=(eq_big["Magnitude"] - 1) * 2.5 + 4,
+                                          symbol="triangle-up", line=dict(color=C["surface"], width=1)),
+                              hovertemplate="M%{y:.1f}<extra>แผ่นดินไหว</extra>"), row=2, col=1)
+    dark_layout(fig6, height=440, hover="closest")
+    fig6.update_yaxes(title_text=UNIT, row=1, col=1)
+    fig6.update_yaxes(title_text="Magnitude", row=2, col=1)
+    show(fig6)
 
-with col3:
-    st.markdown('<div class="section-header">📦 Section 3 — Precursor Time (Δt) Analysis</div>',
-                unsafe_allow_html=True)
-    groups_data = {k: v for k, v in {"3≤M<4": dt_3_4.values, "4≤M<5": dt_4_5.values,
-                                     "M≥5": dt_5up.values}.items() if len(v) > 0}
-    if groups_data:
-        colors = {"3≤M<4": "#3fb950", "4≤M<5": "#e3b341", "M≥5": "#ff7b72"}
-        fig3 = go.Figure()
-        for gname, gdata in groups_data.items():
-            fig3.add_trace(go.Box(y=gdata, name=gname, marker_color=colors[gname], boxmean=True,
-                                  jitter=0.4, pointpos=-1.8, marker=dict(size=4, opacity=0.5)))
+    panel(f"Lag correlation: anomaly วันที่ t → จำนวนแผ่นดินไหว M≥{mag_threshold} วันที่ t+lag",
+          "ค่า Pearson r ระหว่างธง anomaly รายวันกับจำนวนเหตุการณ์ (lag 0–30 วัน)")
+    rdly = radon.resample("D").max()
+    aflag = (rdly > upper).astype(float)
+    eqd = (eq_big.set_index("Time (Thailand)")["Magnitude"].resample("D").count()
+           .reindex(rdly.index, fill_value=0)) if len(eq_big) else pd.Series(0, index=rdly.index)
+    lags = list(range(31))
+    corrs = [0.0 if pd.isna(c := aflag.corr(eqd.shift(-lag))) else float(c) for lag in lags]
+    fig_lag = go.Figure(go.Bar(x=lags, y=corrs, marker=dict(color=[C["accent"] if c >= 0 else "#5f5f5f" for c in corrs],
+                                                           cornerradius=4),
+                               hovertemplate="lag %{x} วัน · r = %{y:.3f}<extra></extra>"))
+    dark_layout(fig_lag, height=240, hover="closest")
+    lim = max(0.3, max(abs(c) for c in corrs) * 1.15)
+    fig_lag.update_layout(xaxis_title="lag (วัน)", yaxis_title="Pearson r", yaxis=dict(range=[-lim, lim]))
+    show(fig_lag)
+
+# ══ TAB 3 — Hazard Forecast ════════════════════════════════════════════════
+with tab3:
+    c5a, c5b = st.columns([2.2, 1])
+    with c5a:
+        panel(f"Daily hazard rate — {days_ahead} วันนับจาก anomaly ล่าสุด",
+              f"M≥{_snap} ภายใน {radius_km} km · เส้นประคือเกณฑ์ HIGH (0.10) และ VERY HIGH (0.20)")
+        fig5 = go.Figure()
+        for rl, col in RISK_COLOR.items():
+            sub = haz_df[haz_df["risk_level"] == rl]
+            if len(sub):
+                fig5.add_trace(go.Bar(x=sub["forecast_date"], y=sub["hazard"], name=f"{RISK_ICON[rl]} {rl}",
+                                      marker=dict(color=col, cornerradius=4), width=86400000 * 0.75,
+                                      hovertemplate="%{x|%d/%m/%Y}<br>hazard %{y:.4f}<extra>" + rl + "</extra>"))
+        for y, lab, col in [(0.10, "HIGH 0.10", C["serious"]), (0.20, "VERY HIGH 0.20", C["critical"])]:
+            fig5.add_hline(y=y, line_dash="dash", line_color=col, line_width=1,
+                           annotation_text=lab, annotation_font_color=C["ink2"], annotation_position="top right")
+        fig5.add_hline(y=baseline_safe, line_dash="dot", line_color=C["ink2"], line_width=1,
+                       annotation_text=f"baseline {baseline_safe:.4f}", annotation_font_color=C["ink2"],
+                       annotation_position="bottom right")
+        if anchor <= pd.Timestamp(NOW) <= anchor + pd.Timedelta(days=days_ahead):
+            fig5.add_vline(x=pd.Timestamp(NOW), line_color=C["ink"], line_width=1)
+            fig5.add_annotation(x=pd.Timestamp(NOW), y=1, yref="paper", text="วันนี้", showarrow=False,
+                                font=dict(color=C["ink"], size=11), yanchor="bottom")
+        dark_layout(fig5, height=380, hover="closest")
+        fig5.update_layout(barmode="overlay", xaxis_title="วันที่", yaxis_title="hazard")
+        show(fig5)
+    with c5b:
+        panel("รายงานการพยากรณ์")
+        st.markdown(f"""
+        <div class="tile">
+          <table class="rtable">
+            <tr><td style="color:{C['ink2']}">Anomaly ล่าสุด (จุดเริ่มนับ)</td><td class="mono" style="text-align:right">{anchor:%d/%m/%Y %H:%M}</td></tr>
+            <tr><td style="color:{C['ink2']}">ค่า ณ จุดนั้น</td><td class="mono" style="text-align:right">{fmt_v(latest_anom_val)} {UNIT}</td></tr>
+            <tr><td style="color:{C['ink2']}">Baseline hazard</td><td class="mono" style="text-align:right">{baseline_safe:.5f}</td></tr>
+            <tr><td style="color:{C['ink2']}">Peak hazard</td><td class="mono" style="text-align:right">{peak_haz:.4f} (Day {peak_day})</td></tr>
+            <tr><td style="color:{C['ink2']}">วันเสี่ยงสูง</td><td class="mono" style="text-align:right">{n_high} / {days_ahead} วัน</td></tr>
+            <tr><td style="color:{C['ink2']}">ความเสี่ยงวันนี้</td><td style="text-align:right">{badge(today_level)}</td></tr>
+          </table>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        panel("ปฏิทินวันเสี่ยง", "เฉพาะวันที่ระดับ HIGH ขึ้นไป")
+        risk_rows = haz_df[haz_df["risk_level"].isin(["HIGH", "VERY HIGH"])]
+        if len(risk_rows):
+            html = '<div class="tile scroll"><table class="rtable"><tr><th>วันที่</th><th>Day</th><th>hazard</th><th>ระดับ</th></tr>'
+            for _, r in risk_rows.iterrows():
+                html += (f"<tr><td class='mono'>{r['forecast_date']:%d/%m}</td><td class='mono'>{int(r['day'])}</td>"
+                         f"<td class='mono'>{r['hazard']:.4f}</td><td>{badge(r['risk_level'])}</td></tr>")
+            st.markdown(html + "</table></div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="tile">{badge("LOW")} &nbsp;ไม่มีวันเสี่ยงสูงในหน้าต่างพยากรณ์</div>',
+                        unsafe_allow_html=True)
+    st.markdown('<div class="note">Hazard คำนวณจากสัดส่วนของ anomaly ในอดีตที่ตามด้วยแผ่นดินไหวในวันที่ d '
+                '(piecewise hazard จาก anomaly ล่าสุดไม่เกิน 1,000 จุด) เป็นค่าเชิงสถิติเพื่อการวิจัย '
+                'ไม่ใช่การพยากรณ์แผ่นดินไหวอย่างเป็นทางการ</div>', unsafe_allow_html=True)
+    st.download_button("⬇️ ดาวน์โหลดผลพยากรณ์ (CSV)", haz_df.to_csv(index=False).encode("utf-8-sig"),
+                       f"st001_{channel.lower()}_hazard_forecast.csv", "text/csv")
+
+# ══ TAB 4 — Precursor statistics ═══════════════════════════════════════════
+with tab4:
+    c3, c4 = st.columns(2)
+    with c3:
+        groups = {k: v for k, v in {"3≤M<4": (dt_3_4.values, MAG_COLOR[3.0]),
+                                    "4≤M<5": (dt_4_5.values, MAG_COLOR[4.0]),
+                                    "M≥5": (dt_5up.values, MAG_COLOR[5.0])}.items() if len(v[0]) > 0}
         if len(dt_4_5) > 1 and len(dt_5up) > 1:
             _, p = mannwhitneyu(dt_4_5, dt_5up, alternative="two-sided")
-            annot = f"M-W U test (M4 vs M5): p={p:.4f} {'✓ sig' if p < 0.05 else '✗ n.s.'}"
+            mw = f"Mann-Whitney U (4≤M<5 vs M≥5): p = {p:.4f} {'· มีนัยสำคัญ' if p < 0.05 else '· ไม่มีนัยสำคัญ'}"
         else:
-            annot = "Not enough data for M-W U test"
-        cream_layout(fig3, "Precursor Δt by Magnitude Group", height=360)
-        fig3.update_layout(yaxis_title="Days before EQ (Δt)",
-                           annotations=[dict(text=annot, xref="paper", yref="paper", x=0.01, y=1.05,
-                                             showarrow=False, font=dict(size=10, color="#7a5c3a"))])
-        st.plotly_chart(fig3, width="stretch")
-    else:
-        st.info("Insufficient event data for precursor analysis.")
+            mw = "ข้อมูลไม่พอสำหรับ Mann-Whitney U test"
+        panel("ระยะเวลานำ (Δt) จาก anomaly ถึงแผ่นดินไหว", mw)
+        if groups:
+            fig3 = go.Figure()
+            for g, (vals, col) in groups.items():
+                fig3.add_trace(go.Box(y=vals, name=g, marker=dict(color=col, size=4, opacity=0.5),
+                                      line=dict(width=1.5), boxmean=True, boxpoints="outliers"))
+            dark_layout(fig3, height=380, hover="closest")
+            fig3.update_layout(showlegend=False, yaxis_title="Δt (วัน)")
+            show(fig3)
+        else:
+            st.info("ยังไม่มีเหตุการณ์พอสำหรับวิเคราะห์ Δt")
+    with c4:
+        panel("Kaplan-Meier: ความน่าจะเป็นที่ยังไม่เกิดแผ่นดินไหว",
+              f"S(t) หลัง anomaly · หน้าต่าง {days_ahead} วัน · R≤{radius_km} km · แถบจางคือ 95% CI")
+        fig4 = go.Figure()
+        for T, E, lab, col in [(T3, E3, "M≥3", MAG_COLOR[3.0]), (T4, E4, "M≥4", MAG_COLOR[4.0]),
+                               (T5, E5, "M≥5", MAG_COLOR[5.0])]:
+            if len(E) == 0 or E.sum() == 0:
+                continue
+            try:
+                kmf = KaplanMeierFitter().fit(T.astype(float), event_observed=E.astype(int), label=lab)
+                t_ = kmf.survival_function_.index
+                s_ = kmf.survival_function_[lab].values
+                lo, hi = kmf.confidence_interval_.iloc[:, 0].values, kmf.confidence_interval_.iloc[:, 1].values
+                r, g, b = (int(col[i:i + 2], 16) for i in (1, 3, 5))
+                fig4.add_trace(go.Scatter(x=list(t_) + list(t_[::-1]), y=list(hi) + list(lo[::-1]), fill="toself",
+                                          fillcolor=f"rgba({r},{g},{b},0.15)", line=dict(width=0),
+                                          showlegend=False, hoverinfo="skip"))
+                fig4.add_trace(go.Scatter(x=t_, y=s_, mode="lines", name=lab, line=dict(color=col, width=2, shape="hv"),
+                                          hovertemplate="วันที่ %{x:.1f} · S = %{y:.3f}<extra>" + lab + "</extra>"))
+            except Exception:
+                pass
+        dark_layout(fig4, height=380, hover="closest")
+        fig4.update_layout(xaxis_title="วันหลัง anomaly", yaxis_title="S(t)", yaxis=dict(range=[0, 1.05]))
+        show(fig4)
 
-with col4:
-    st.markdown('<div class="section-header">📈 Section 4 — Kaplan-Meier Survival Curves</div>',
+# ══ TAB 5 — Verification & tuning ══════════════════════════════════════════
+with tab5:
+    big_t = eq_big["Time (Thailand)"].values
+    peak_rl = risk_level(peak_haz)
+    region_col = next((c for c in eq_near.columns if "region" in c.lower() or "พื้นที่" in c.lower()), None)
+    vrows = []
+    for at, val in radon_anom.items():
+        lo_i = np.searchsorted(big_t, np.datetime64(at), side="right")
+        hi_i = np.searchsorted(big_t, np.datetime64(at + pd.Timedelta(days=days_ahead)), side="right")
+        ea = eq_big.iloc[lo_i:hi_i]
+        n = len(ea)
+        first = ea.iloc[0] if n else None
+        vrows.append({
+            "Anomaly Time": at, f"Radon ({UNIT})": round(float(val), 1), "Risk Level": peak_rl,
+            "มี EQ ตามมา": "✅ ใช่" if n else "❌ ไม่",
+            "EQ แรก": first["Time (Thailand)"].strftime("%Y-%m-%d") if n else "-",
+            "Δt (วัน)": f"{(first['Time (Thailand)'] - at).total_seconds() / 86400:.1f}" if n else "-",
+            "Max Mag": f"{ea['Magnitude'].max():.1f}" if n else "-",
+            "Region": (str(first[region_col])[:50] if region_col else "-") if n else "-",
+            "จำนวน EQ": n,
+        })
+    vdf = pd.DataFrame(vrows, columns=["Anomaly Time", f"Radon ({UNIT})", "Risk Level", "มี EQ ตามมา", "EQ แรก",
+                                       "Δt (วัน)", "Max Mag", "Region", "จำนวน EQ"])
+    hit = vdf[vdf["มี EQ ตามมา"] == "✅ ใช่"]
+    miss = vdf[vdf["มี EQ ตามมา"] == "❌ ไม่"]
+    n_total, n_hit = len(vdf), len(hit)
+    hit_rate = n_hit / n_total * 100 if n_total else 0
+
+    s1, s2, s3 = st.columns(3)
+    s1.markdown(tile("Anomaly ทั้งหมด", f"{n_total:,}", "ชม."), unsafe_allow_html=True)
+    s2.markdown(tile("มีแผ่นดินไหวตามมา (hit)", f"{hit_rate:.1f}", "%", f"{n_hit:,} ครั้ง", C["good"]),
                 unsafe_allow_html=True)
-    fig4 = go.Figure()
-    for T, E, label, color in [(T3, E3, "M≥3", "#3fb950"), (T4, E4, "M≥4", "#e3b341"), (T5, E5, "M≥5", "#ff7b72")]:
-        if len(E) == 0 or E.sum() == 0:
-            continue
-        try:
-            kmf = KaplanMeierFitter().fit(T.astype(float), event_observed=E.astype(int), label=label)
-            t_ = kmf.survival_function_.index
-            s_ = kmf.survival_function_[label].values
-            lo, hi = kmf.confidence_interval_.iloc[:, 0].values, kmf.confidence_interval_.iloc[:, 1].values
-            r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
-            fig4.add_trace(go.Scatter(x=list(t_) + list(t_[::-1]), y=list(hi) + list(lo[::-1]),
-                                      fill="toself", fillcolor=f"rgba({r},{g},{b},0.15)",
-                                      line=dict(width=0), showlegend=False, hoverinfo="skip"))
-            fig4.add_trace(go.Scatter(x=t_, y=s_, mode="lines", name=label, line=dict(color=color, width=2)))
-        except Exception:
-            pass
-    cream_layout(fig4, f"Kaplan-Meier S(t) — window={days_ahead}d, R≤{radius_km}km", height=360)
-    fig4.update_layout(xaxis_title="Days since radon anomaly", yaxis_title="Survival probability S(t)",
-                       yaxis=dict(range=[0, 1.05]))
-    st.plotly_chart(fig4, width="stretch")
+    s3.markdown(tile("ไม่มีแผ่นดินไหว (false alarm)", f"{100 - hit_rate:.1f}", "%", f"{n_total - n_hit:,} ครั้ง",
+                     C["critical"]), unsafe_allow_html=True)
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 5 — Hazard Forecast
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown(f'<div class="section-header">🚨 Section 5 — Earthquake Hazard Forecast '
-            f'(M≥{_snap}, R≤{radius_km}km)</div>', unsafe_allow_html=True)
-col5a, col5b = st.columns([2, 1])
+    panel(f"Anomaly ที่ตามด้วยแผ่นดินไหว M≥{mag_threshold} ภายใน {days_ahead} วัน",
+          f"วงกลมทึบ = มีแผ่นดินไหวตามมา · วงกลมกลวง = ไม่มี · สามเหลี่ยม = แผ่นดินไหวจริง (R≤{radius_km} km)")
+    fig7 = go.Figure()
+    fig7.add_trace(go.Scatter(x=hit["Anomaly Time"], y=hit[f"Radon ({UNIT})"], mode="markers", name="มี EQ ตามมา",
+                              marker=dict(color=C["good"], size=8, line=dict(color=C["surface"], width=2))))
+    fig7.add_trace(go.Scatter(x=miss["Anomaly Time"], y=miss[f"Radon ({UNIT})"], mode="markers", name="ไม่มี EQ",
+                              marker=dict(color="rgba(0,0,0,0)", size=8, line=dict(color=C["critical"], width=1.5))))
+    y_eq = float(radon_anom.min()) * 0.9 if len(radon_anom) else 0
+    fig7.add_trace(go.Scatter(x=eq_big["Time (Thailand)"], y=[y_eq] * len(eq_big), mode="markers",
+                              name=f"แผ่นดินไหว M≥{mag_threshold}", customdata=eq_big["Magnitude"],
+                              marker=dict(color=C["eq"], size=eq_big["Magnitude"] * 2, symbol="triangle-up"),
+                              hovertemplate="%{x|%d/%m/%Y} · M%{customdata:.1f}<extra></extra>"))
+    dark_layout(fig7, height=360, hover="closest")
+    fig7.update_layout(yaxis_title=UNIT)
+    show(fig7)
 
-with col5a:
-    fig5 = go.Figure()
-    for rl, color in RISK_COLOR.items():
-        sub = haz_df[haz_df["risk_level"] == rl]
-        if len(sub):
-            fig5.add_trace(go.Bar(x=sub["forecast_date"], y=sub["hazard"], name=rl,
-                                  marker_color=color, opacity=0.85, width=86400000 * 0.8))
-    fig5.add_hline(y=baseline_safe, line_dash="dot", line_color="#7a5c3a",
-                   annotation_text=f"Baseline={baseline_safe:.4f}", annotation_font_color="#7a5c3a")
-    fig5.add_hline(y=0.10, line_dash="dash", line_color="#f0883e",
-                   annotation_text="HIGH (0.10)", annotation_font_color="#f0883e")
-    fig5.add_hline(y=0.20, line_dash="dash", line_color="#ff7b72",
-                   annotation_text="VERY HIGH (0.20)", annotation_font_color="#ff7b72")
-    cream_layout(fig5, f"Hazard Forecast — Anchor: {anchor:%Y-%m-%d}", height=320)
-    fig5.update_layout(barmode="stack", xaxis_title="Forecast Date", yaxis_title="Daily Hazard Rate", bargap=0.05)
-    st.plotly_chart(fig5, width="stretch")
+    panel("ตารางรายละเอียด")
+    vshow = vdf.sort_values("Anomaly Time", ascending=False).copy()
+    vshow["Anomaly Time"] = vshow["Anomaly Time"].dt.strftime("%Y-%m-%d %H:%M")
+    vshow_html = vshow.copy()
+    vshow_html["Risk Level"] = vshow_html["Risk Level"].map(badge)
+    html_table(vshow_html, max_rows=300, height=380)
+    st.download_button("⬇️ ดาวน์โหลดตารางตรวจสอบ (CSV)", vshow.to_csv(index=False).encode("utf-8-sig"),
+                       f"st001_{channel.lower()}_risk_verification.csv", "text/csv")
 
-with col5b:
-    st.markdown("**📋 Forecast Report**")
-    st.markdown(f"""
-    <div style="background:#fff8f0;border:1px solid #d4b896;border-radius:10px;padding:14px;font-size:0.82rem;color:#2c2c2c;">
-      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Anchor date (anomaly ล่าสุด)</span><br>
-        <b>{anchor:%Y-%m-%d %H:%M}</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Latest radon anomaly</span><br>
-        <b style="color:#1a6fbf;">{latest_anom_val:.2f} Bq/m³</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Baseline hazard</span><br>
-        <b>{baseline_safe:.5f}</b></div>
-      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">Peak hazard</span><br>
-        <b style="color:#c05000;">{peak_haz:.4f}</b> on Day {peak_day}</div>
-      <div style="margin-bottom:8px;"><span style="color:#7a5c3a;">High-risk days</span><br>
-        <b style="color:#c0392b;">{n_high}</b> / {days_ahead} days</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    with st.expander("🎯 ปรับพารามิเตอร์ (Grid Search)", expanded=False):
+        st.markdown('<div class="note">ลองทุกชุดของ Magnitude × Radius × Window แล้วหาชุดที่ให้ hit rate สูงสุดสำหรับสถานีนี้ '
+                    '(ใช้ anomaly ล่าสุด 200 จุด) · อ้างอิง Cicerone et al. (2009)</div>', unsafe_allow_html=True)
+        g1, g2, g3 = st.columns(3)
+        grid_mags = g1.multiselect("Magnitude", [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0], default=[1.5, 2.0, 2.5, 3.0, 4.0])
+        grid_radii = g2.multiselect("Radius (km)", [100, 200, 300, 500, 700, 1000], default=[200, 300, 500, 700, 1000])
+        grid_windows = g3.multiselect("Window (วัน)", [7, 14, 21, 30, 45, 60], default=[7, 14, 21, 30])
+        total_comb = len(grid_mags) * len(grid_radii) * len(grid_windows)
+        if st.button(f"🚀 รัน Grid Search ({total_comb} ชุด)", type="primary", disabled=total_comb == 0):
+            prog = st.progress(0, text="กำลังคำนวณ...")
+            res, done = [], 0
+            a_t = radon_anom.iloc[-200:].index.values
+            for mag in grid_mags:
+                for rad in grid_radii:
+                    g_t = eq_sel[(eq_sel["distance_km"] <= rad) & (eq_sel["Magnitude"] >= mag)] \
+                        .sort_values("Time (Thailand)")["Time (Thailand)"].values
+                    for win in grid_windows:
+                        lo_i = np.searchsorted(g_t, a_t, side="right")
+                        hi_i = np.searchsorted(g_t, a_t + np.timedelta64(win, "D"), side="right")
+                        nh, nt = int(np.sum(hi_i > lo_i)), len(a_t)
+                        if len(g_t) and nt:
+                            pp = np.searchsorted(a_t, g_t, side="left")
+                            pv = a_t[np.maximum(pp - 1, 0)]
+                            sens = int(np.sum((pp > 0) & ((g_t - pv) / np.timedelta64(1, "D") <= win))) / len(g_t) * 100
+                        else:
+                            sens = 0.0
+                        res.append({"Magnitude": mag, "Radius (km)": rad, "Window (days)": win, "Hit": nh, "Total": nt,
+                                    "Accuracy (%)": round(nh / nt * 100 if nt else 0, 1),
+                                    "Sensitivity (%)": round(sens, 1)})
+                        done += 1
+                        prog.progress(done / total_comb, text=f"{done}/{total_comb}")
+            prog.empty()
+            gdf = pd.DataFrame(res).sort_values("Accuracy (%)", ascending=False).reset_index(drop=True)
+            best = gdf.iloc[0]
+            b1, b2, b3, b4 = st.columns(4)
+            b1.markdown(tile("Magnitude ที่ดีที่สุด", f"≥ {best['Magnitude']}", accent=C["accent"]), unsafe_allow_html=True)
+            b2.markdown(tile("Radius", f"{best['Radius (km)']:.0f}", "km"), unsafe_allow_html=True)
+            b3.markdown(tile("Window", f"{best['Window (days)']:.0f}", "วัน"), unsafe_allow_html=True)
+            b4.markdown(tile("Hit rate", f"{best['Accuracy (%)']:.1f}", "%",
+                             f"{int(best['Hit'])}/{int(best['Total'])} · Sensitivity {best['Sensitivity (%)']:.1f}%",
+                             C["good"]), unsafe_allow_html=True)
+            bw = int(best["Window (days)"])
+            heat = gdf[gdf["Window (days)"] == bw].pivot_table(index="Magnitude", columns="Radius (km)",
+                                                               values="Accuracy (%)")
+            fig8 = go.Figure(go.Heatmap(z=heat.values, x=[f"{int(c)} km" for c in heat.columns],
+                                        y=[f"M≥{r}" for r in heat.index], xgap=2, ygap=2,
+                                        colorscale=[[0, "#0d2a4d"], [0.5, "#1f6fc6"], [1, "#9ccbff"]],
+                                        text=heat.values.round(1), texttemplate="%{text}%",
+                                        textfont=dict(color=C["page"]), colorbar=dict(title="Hit %")))
+            dark_layout(fig8, f"Hit rate (%) — Window = {bw} วัน", height=340, hover="closest")
+            show(fig8)
+            html_table(gdf, max_rows=20, height=340)
+            st.download_button("⬇️ ดาวน์โหลดผล Grid Search (CSV)", gdf.to_csv(index=False).encode("utf-8-sig"),
+                               f"st001_{channel.lower()}_grid_search.csv", "text/csv")
 
-    st.markdown("<br>**🗓️ Risk Calendar**", unsafe_allow_html=True)
-    risk_rows = haz_df[haz_df["risk_level"].isin(["HIGH", "VERY HIGH"])]
-    if len(risk_rows):
-        badge = {"HIGH": '<span class="badge-high">HIGH</span>',
-                 "VERY HIGH": '<span class="badge-veryhigh">VERY HIGH</span>'}
-        html = '<div class="risk-table"><table><tr><th>Date</th><th>Day</th><th>Hazard</th><th>Level</th></tr>'
-        for _, r in risk_rows.iterrows():
-            html += (f"<tr><td>{r['forecast_date']:%m/%d}</td><td>{int(r['day'])}</td>"
-                     f"<td>{r['hazard']:.4f}</td><td>{badge[r['risk_level']]}</td></tr>")
-        st.markdown(html + "</table></div>", unsafe_allow_html=True)
-    else:
-        st.markdown('<span class="badge-low">LOW — No high-risk days in window</span>', unsafe_allow_html=True)
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 6 — Correlation Timeline
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">🔗 Section 6 — Radon–Earthquake Correlation Timeline</div>',
-            unsafe_allow_html=True)
-fig6 = make_subplots(specs=[[{"secondary_y": True}]])
-step2 = max(1, len(radon) // 1500)
-radon_ds = radon.iloc[::step2]
-fig6.add_trace(go.Scatter(x=radon_ds.index, y=radon_ds.values, mode="lines", name=f"{ch_short} ({UNIT})",
-                          line=dict(color=CHANNELS[channel]["color"], width=1.2), opacity=0.8), secondary_y=False)
-fig6.add_trace(go.Scatter(x=radon_anom.index, y=radon_anom.values, mode="markers", name="Radon Anomaly",
-                          marker=dict(color="#ff7b72", size=5)), secondary_y=False)
-eq_plot = eq_near[eq_near["Magnitude"] >= mag_threshold]
-fig6.add_trace(go.Scatter(
-    x=eq_plot["Time (Thailand)"], y=eq_plot["Magnitude"], mode="markers", name=f"EQ M≥{mag_threshold}",
-    marker=dict(color=eq_plot["Magnitude"], colorscale=[[0, "#e3b341"], [1, "#ff7b72"]],
-                size=(eq_plot["Magnitude"] - 2) * 3 + 4, opacity=0.75, symbol="triangle-up")),
-    secondary_y=True)
-cream_layout(fig6, "Radon Anomalies vs Earthquake Events (Dual Axis)", height=320)
-fig6.update_yaxes(title_text="Radon (Bq/m³)", secondary_y=False, gridcolor=GRID_COLOR, color=FONT_COLOR)
-fig6.update_yaxes(title_text="Earthquake Magnitude", secondary_y=True, gridcolor=GRID_COLOR, color=FONT_COLOR)
-st.plotly_chart(fig6, width="stretch")
-
-st.markdown("**📉 Lag Correlation: Radon Anomaly → EQ events (lag 0–30 days)**")
-radon_daily = radon.resample("D").max()
-anom_flag = (radon_daily > upper).astype(float)
-eq_daily = (eq_plot.set_index("Time (Thailand)")["Magnitude"].resample("D").count()
-            .reindex(radon_daily.index, fill_value=0)) if len(eq_plot) else pd.Series(0, index=radon_daily.index)
-lags = list(range(31))
-corrs = []
-for lag in lags:
-    c = anom_flag.shift(lag).corr(eq_daily)  # anomaly วันที่ t เทียบกับ EQ วันที่ t+lag
-    corrs.append(0.0 if pd.isna(c) else float(c))
-fig_lag = go.Figure(go.Bar(x=lags, y=corrs, marker=dict(
-    color=corrs, colorscale=[[0, "#b89b78"], [0.5, "#388bfd"], [1, "#ff7b72"]], cmin=-1, cmax=1)))
-fig_lag.add_hline(y=0, line_color="#7a5c3a", line_width=1)
-cream_layout(fig_lag, f"Lag Correlation (Radon Anomaly → EQ M≥{mag_threshold})", height=220)
-lim = max(0.3, max(abs(c) for c in corrs) * 1.1)
-fig_lag.update_layout(xaxis_title="Lag (days)", yaxis_title="Pearson r", yaxis=dict(range=[-lim, lim]))
-st.plotly_chart(fig_lag, width="stretch")
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 7 — Risk Prediction vs Actual Earthquake Verification
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">✅ Section 7 — เปรียบเทียบ Risk ที่ทำนาย vs แผ่นดินไหวจริง</div>',
-            unsafe_allow_html=True)
-
-# Peak hazard มาจากโมเดลรวมของทุก anomaly → ค่าเดียวกันทุกแถว คำนวณครั้งเดียว
-peak_rl = risk_level(peak_haz)
-region_col = next((c for c in eq_near.columns if "region" in c.lower() or "พื้นที่" in c.lower()), None)
-eq_big = eq_near[eq_near["Magnitude"] >= mag_threshold].sort_values("Time (Thailand)")
-big_t = eq_big["Time (Thailand)"].values
-
-verify_rows = []
-for anom_time, radon_val in radon_anom.items():
-    t0 = np.datetime64(anom_time)
-    lo_i = np.searchsorted(big_t, t0, side="right")
-    hi_i = np.searchsorted(big_t, np.datetime64(anom_time + pd.Timedelta(days=days_ahead)), side="right")
-    eq_after = eq_big.iloc[lo_i:hi_i]
-    n = len(eq_after)
-    if n:
-        first = eq_after.iloc[0]
-        region = str(first[region_col]) if region_col else "-"
-        region = region[:50] + "..." if len(region) > 50 else region
-    verify_rows.append({
-        "Anomaly Time": anom_time.strftime("%Y-%m-%d %H:%M"),
-        "Radon (Bq/m³)": round(float(radon_val), 2),
-        "Peak Hazard": round(peak_haz, 4),
-        "Risk Level": peak_rl,
-        "EQ จริงไหม": "✅ ใช่" if n else "❌ ไม่",
-        "EQ แรก": first["Time (Thailand)"].strftime("%Y-%m-%d") if n else "-",
-        "Δt (วัน)": int((first["Time (Thailand)"] - anom_time).total_seconds() // 86400) if n else "-",
-        "Max Mag": round(float(eq_after["Magnitude"].max()), 1) if n else "-",
-        "Region": region if n else "-",
-        "จำนวน EQ": n,
-    })
-
-verify_df = pd.DataFrame(verify_rows, columns=[
-    "Anomaly Time", "Radon (Bq/m³)", "Peak Hazard", "Risk Level", "EQ จริงไหม",
-    "EQ แรก", "Δt (วัน)", "Max Mag", "Region", "จำนวน EQ"])
-verify_df = verify_df.sort_values("Anomaly Time", ascending=False).reset_index(drop=True)
-for c in ["Δt (วัน)", "Max Mag"]:
-    verify_df[c] = verify_df[c].astype(str)
-
-st.markdown("**📊 กราฟ: Radon Anomaly ที่ตามด้วยแผ่นดินไหวจริง vs ไม่มี**")
-matched_df = verify_df[verify_df["EQ จริงไหม"] == "✅ ใช่"]
-no_match_df = verify_df[verify_df["EQ จริงไหม"] == "❌ ไม่"]
-fig7 = go.Figure()
-fig7.add_trace(go.Scatter(x=pd.to_datetime(matched_df["Anomaly Time"]), y=matched_df["Radon (Bq/m³)"],
-                          mode="markers", name="✅ มี EQ ตามมา", marker=dict(color="#2e8b57", size=7)))
-fig7.add_trace(go.Scatter(x=pd.to_datetime(no_match_df["Anomaly Time"]), y=no_match_df["Radon (Bq/m³)"],
-                          mode="markers", name="❌ ไม่มี EQ", marker=dict(color="#c0392b", size=6, opacity=0.6)))
-y_eq = float(radon_anom.min()) * 0.9 if len(radon_anom) else 0
-fig7.add_trace(go.Scatter(x=eq_big["Time (Thailand)"], y=[y_eq] * len(eq_big), mode="markers",
-                          name=f"EQ จริง M≥{mag_threshold}",
-                          marker=dict(color="#f1c40f", size=eq_big["Magnitude"] * 2, symbol="triangle-up",
-                                      opacity=0.8, line=dict(color="#7a5c3a", width=0.5))))
-cream_layout(fig7, f"Radon Anomaly vs EQ จริง M≥{mag_threshold} ภายใน {days_ahead} วัน (R≤{radius_km}km)", height=360)
-fig7.update_layout(xaxis_title="Time", yaxis_title="Radon (Bq/m³)")
-st.plotly_chart(fig7, width="stretch")
-
-n_total, n_hit = len(verify_df), len(matched_df)
-hit_rate = n_hit / n_total * 100 if n_total else 0
-sc1, sc2, sc3 = st.columns(3)
-sc1.metric("📊 Anomaly ทั้งหมด", f"{n_total:,}")
-sc2.metric("✅ มี EQ ตามมา (Hit rate)", f"{n_hit:,}", f"{hit_rate:.1f}%", delta_color="off")
-sc3.metric("❌ ไม่มี EQ (False alarm)", f"{n_total - n_hit:,}", f"{100 - hit_rate:.1f}%", delta_color="off")
-
-st.markdown("**📋 ตาราง: รายละเอียด Anomaly vs EQ จริง**")
-
-
-def color_risk(val):
-    c = {"LOW": "#2e8b57", "MODERATE": "#c8860a", "HIGH": "#c05000", "VERY HIGH": "#c0392b"}.get(val, "#2c2c2c")
-    return f"color: {c}; font-weight: bold"
-
-
-def color_match(val):
-    return "color: #2e8b57; font-weight: bold" if "✅" in str(val) else "color: #c0392b; font-weight: bold"
-
-
-sty = verify_df.style
-_map = sty.map if hasattr(sty, "map") else sty.applymap
-styled = (_map(color_risk, subset=["Risk Level"]))
-styled = (styled.map if hasattr(styled, "map") else styled.applymap)(color_match, subset=["EQ จริงไหม"])
-styled = styled.format({"Peak Hazard": "{:.4f}", "Radon (Bq/m³)": "{:.2f}"}).set_properties(
-    **{"background-color": "#fff8f0", "color": "#2c2c2c", "border": "1px solid #d4b896"})
-st.dataframe(styled, width="stretch", height=400)
-st.download_button("⬇️ Download Verification Table CSV", verify_df.to_csv(index=False).encode("utf-8-sig"),
-                   f"st001_{channel.lower()}_risk_verification.csv", "text/csv")
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SECTION 8 — Parameter Optimization (Grid Search)
-# ═══════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">🎯 Section 8 — Parameter Optimization (Grid Search)</div>',
-            unsafe_allow_html=True)
-st.markdown("""
-<div style="background:#fff8f0;border:1px solid #d4b896;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:0.82rem;color:#2c2c2c;">
-  <b>🔬 หลักการ:</b> Grid Search ลองทุก combination ของ Magnitude / Radius / Window
-  แล้วหาว่า combination ไหนให้ <b>Hit rate สูงสุด</b> สำหรับข้อมูลของสถานีนี้<br>
-  อ้างอิง: Sensitivity Analysis in Radon Precursor Studies (Cicerone et al., 2009)
-</div>
-""", unsafe_allow_html=True)
-
-g1, g2, g3 = st.columns(3)
-with g1:
-    grid_mags = st.multiselect("⚡ Magnitude options", [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0],
-                               default=[1.5, 2.0, 2.5, 3.0, 4.0])
-with g2:
-    grid_radii = st.multiselect("📡 Radius options (km)", [100, 200, 300, 500, 700, 1000],
-                                default=[200, 300, 500, 700, 1000])
-with g3:
-    grid_windows = st.multiselect("📆 Window options (days)", [7, 14, 21, 30, 45, 60], default=[7, 14, 21, 30])
-
-total_combinations = len(grid_mags) * len(grid_radii) * len(grid_windows)
-st.markdown(f"**จำนวน combination ทั้งหมด: {total_combinations} แบบ**")
-
-if st.button("🚀 รัน Grid Search", type="primary", disabled=total_combinations == 0):
-    progress = st.progress(0, text="กำลังคำนวณ...")
-    grid_results, done = [], 0
-    grid_anom = radon_anom.iloc[-200:]
-    a_t = grid_anom.index.values
-
-    for mag in grid_mags:
-        for rad in grid_radii:
-            eq_g = eq_sel[(eq_sel["distance_km"] <= rad) & (eq_sel["Magnitude"] >= mag)].sort_values("Time (Thailand)")
-            g_t = eq_g["Time (Thailand)"].values
-            for win in grid_windows:
-                lo_i = np.searchsorted(g_t, a_t, side="right")
-                hi_i = np.searchsorted(g_t, a_t + np.timedelta64(win, "D"), side="right")
-                n_hit_g = int(np.sum(hi_i > lo_i))
-                n_tot_g = len(a_t)
-                # EQ ที่มี anomaly ก่อนหน้าภายใน win วัน
-                if len(g_t) and n_tot_g:
-                    p = np.searchsorted(a_t, g_t, side="left")
-                    prev = a_t[np.maximum(p - 1, 0)]
-                    covered = int(np.sum((p > 0) & ((g_t - prev) / np.timedelta64(1, "D") <= win)))
-                    sens = covered / len(g_t) * 100
-                else:
-                    sens = 0.0
-                grid_results.append({
-                    "Magnitude": mag, "Radius (km)": rad, "Window (days)": win,
-                    "Hit": n_hit_g, "Total": n_tot_g,
-                    "Accuracy (%)": round(n_hit_g / n_tot_g * 100 if n_tot_g else 0, 1),
-                    "Sensitivity (%)": round(sens, 1),
-                })
-                done += 1
-                progress.progress(done / total_combinations, text=f"คำนวณ {done}/{total_combinations} combinations...")
-    progress.empty()
-
-    grid_df = pd.DataFrame(grid_results).sort_values("Accuracy (%)", ascending=False).reset_index(drop=True)
-    best = grid_df.iloc[0]
-    st.markdown(f"""
-    <div style="background:#fff8f0;border:2px solid #a0522d;border-radius:12px;padding:16px 24px;margin:12px 0;text-align:center;">
-      <div style="font-size:1rem;font-weight:700;color:#a0522d;margin-bottom:8px;">🏆 Best Parameters</div>
-      <div style="font-size:0.9rem;color:#2c2c2c;">
-        Magnitude ≥ <b style="color:#c05000;">{best['Magnitude']}</b> &nbsp;|&nbsp;
-        Radius <b style="color:#c05000;">{best['Radius (km)']:.0f} km</b> &nbsp;|&nbsp;
-        Window <b style="color:#c05000;">{best['Window (days)']:.0f} วัน</b>
-      </div>
-      <div style="font-size:1.3rem;font-weight:700;color:#2e8b57;margin-top:8px;">Hit rate: {best['Accuracy (%)']:.1f}%</div>
-      <div style="font-size:0.75rem;color:#7a5c3a;margin-top:4px;">
-        จาก {int(best['Hit'])} anomaly ที่ตามด้วย EQ จริง / {int(best['Total'])} anomaly ทั้งหมด
-        &nbsp;|&nbsp; Sensitivity {best['Sensitivity (%)']:.1f}%
-      </div>
-    </div>""", unsafe_allow_html=True)
-
-    best_win = int(best["Window (days)"])
-    heat = grid_df[grid_df["Window (days)"] == best_win].pivot_table(
-        index="Magnitude", columns="Radius (km)", values="Accuracy (%)")
-    fig8a = go.Figure(go.Heatmap(
-        z=heat.values, x=[f"{int(c)} km" for c in heat.columns], y=[f"M≥{r}" for r in heat.index],
-        colorscale=[[0, "#fff8f0"], [0.5, "#f0883e"], [1, "#2e8b57"]],
-        text=heat.values.round(1), texttemplate="%{text}%", colorbar=dict(title="Hit %")))
-    cream_layout(fig8a, f"Heatmap: Hit rate (%) — Window={best_win} วัน", height=350)
-    fig8a.update_layout(xaxis_title="Radius (km)", yaxis_title="Magnitude Threshold")
-    st.plotly_chart(fig8a, width="stretch")
-
-    line_df = grid_df[(grid_df["Magnitude"] == best["Magnitude"]) &
-                      (grid_df["Radius (km)"] == best["Radius (km)"])].sort_values("Window (days)")
-    fig8b = go.Figure(go.Scatter(
-        x=line_df["Window (days)"], y=line_df["Accuracy (%)"], mode="lines+markers+text",
-        text=line_df["Accuracy (%)"].map(lambda x: f"{x:.1f}%"), textposition="top center",
-        line=dict(color="#a0522d", width=2), marker=dict(size=10, color="#a0522d")))
-    cream_layout(fig8b, f"Hit rate vs Window (M≥{best['Magnitude']}, R={best['Radius (km)']:.0f}km)", height=300)
-    fig8b.update_layout(xaxis_title="Window (days)", yaxis_title="Hit rate (%)")
-    st.plotly_chart(fig8b, width="stretch")
-
-    st.markdown("**📋 Top 10 Best Combinations**")
-    st.dataframe(grid_df.head(10).style.background_gradient(subset=["Accuracy (%)"], cmap="RdYlGn")
-                 .format({"Accuracy (%)": "{:.1f}%", "Sensitivity (%)": "{:.1f}%"}),
-                 width="stretch", height=380)
-    st.download_button("⬇️ Download Grid Search Results CSV", grid_df.to_csv(index=False).encode("utf-8-sig"),
-                       f"st001_{channel.lower()}_grid_search.csv", "text/csv")
+    csv_anom = radon_anom.rename(UNIT).rename_axis("Timestamp").reset_index()
+    st.download_button("⬇️ ดาวน์โหลดรายการ Anomaly (CSV)", csv_anom.to_csv(index=False).encode("utf-8-sig"),
+                       f"st001_{channel.lower()}_anomalies.csv", "text/csv")
 
 # ─── Visit Counter ───────────────────────────────────────────────────────────
 COUNTER_FILE = "/tmp/visitor_count_st001.json"
@@ -1134,44 +1192,17 @@ def save_total_visits(n):
 
 if "counted" not in st.session_state:
     st.session_state.counted = True
-    st.session_state.visit_count = 1
     st.session_state.total_visits = load_total_visits() + 1
     save_total_visits(st.session_state.total_visits)
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
-st.markdown("---")
-fcol1, fcol2, fcol3 = st.columns(3)
-with fcol1:
-    csv_radon = radon_anom.rename("Bq/m³").rename_axis("Timestamp").reset_index()
-    st.download_button("⬇️ Download Anomalies CSV", csv_radon.to_csv(index=False).encode("utf-8-sig"),
-                       f"st001_{channel.lower()}_anomalies.csv", "text/csv")
-with fcol2:
-    st.download_button("⬇️ Download Forecast CSV", haz_df.to_csv(index=False).encode("utf-8-sig"),
-                       f"st001_{channel.lower()}_hazard_forecast.csv", "text/csv")
-with fcol3:
-    st.markdown(f"<div style='color:#7a5c3a;font-size:0.75rem;padding-top:8px;'>"
-                f"Data: {start_date.date()} → {end_date.date()}<br>"
-                f"Anomalies: {len(radon_anom)} | EQ nearby: {len(eq_near)}</div>", unsafe_allow_html=True)
-
-# ─── Copyright Bar (ล่างสุด) ─────────────────────────────────────────────────
 st.markdown(f"""
-<div style="background:#f5ead8;border:1px solid #d4b896;border-radius:10px;padding:16px 24px;margin-top:20px;
-            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-  <div style="font-size:0.85rem;color:#2c2c2c;min-width:200px;">
-    🌐 <b>ผู้เข้าชมสะสม:</b>
-    <span style="color:#a0522d;font-size:1.2rem;font-weight:700;margin-left:4px;">{st.session_state.total_visits:,}</span> ครั้ง
-  </div>
-  <div style="font-size:0.82rem;color:#7a5c3a;text-align:center;flex:1;">
-    🔬 <b style="color:#2c2c2c;font-size:0.9rem;">iRES-MCM Radon & Earthquake Hazard Dashboard</b><br>
-    สถานีตรวจวัดเรดอน มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน (RMUTI)<br>
-    <span style="font-size:0.72rem;">{STATION_NAME} | {ch_label} | Lat: {STATION[0]}°N, Lon: {STATION[1]}°E</span>
-  </div>
-  <div style="font-size:0.75rem;color:#7a5c3a;text-align:right;min-width:200px;">
-    📅 เริ่มพัฒนา: <b>มกราคม 2568</b><br>
-    📡 ข้อมูลเรดอนล่าสุด: <b>{latest_txt}</b><br>
-    🔄 หน้าเว็บโหลดเมื่อ: <b>{NOW:%d/%m/%Y %H:%M}</b><br>
-    © 2568 สงวนลิขสิทธิ์ ห้ามคัดลอกโดยไม่ได้รับอนุญาต
-  </div>
+<div class="footer">
+  <div>🔬 <b style="color:{C['ink']}">iRES-MCM Radon &amp; Earthquake Hazard Dashboard</b> · {STATION_NAME}<br>
+    สถานีตรวจวัดเรดอน มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน (RMUTI) · Lat {STATION[0]}°N, Lon {STATION[1]}°E</div>
+  <div style="text-align:right">ผู้เข้าชมสะสม <b class="mono" style="color:{C['ink']}">{st.session_state.total_visits:,}</b> ครั้ง ·
+    ข้อมูลเรดอนล่าสุด <span class="mono">{latest_txt}</span><br>
+    เริ่มพัฒนา มกราคม 2568 · © 2568 สงวนลิขสิทธิ์ ห้ามคัดลอกโดยไม่ได้รับอนุญาต</div>
 </div>
 """, unsafe_allow_html=True)
 
