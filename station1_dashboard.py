@@ -436,12 +436,16 @@ header[data-testid="stHeader"] {{ background: transparent; }}
     color: {C['ink2']}; margin: 18px 0 6px; font-weight: 600; }}
 [data-testid="stSidebar"] input {{ background: {C['surface']} !important; color: {C['ink']} !important; }}
 
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] {{ gap: 4px; border-bottom: 1px solid {C['border']}; }}
-.stTabs [data-baseweb="tab"] {{ background: transparent; padding: 10px 16px;
-    border-radius: 8px 8px 0 0; font-weight: 500; }}
-.stTabs [aria-selected="true"] {{ color: {C['ink']} !important; background: {C['surface']}; }}
-.stTabs [data-baseweb="tab-highlight"] {{ background: {C['accent']}; }}
+/* Tabs (Streamlit รุ่นใหม่ใช้ data-testid="stTab", รุ่นเก่าใช้ data-baseweb="tab") */
+.stTabs [role="tablist"] {{ gap: 6px; border-bottom: 1px solid {C['border']}; }}
+.stTabs [role="tab"] {{ background: transparent; padding: 10px 16px; border-radius: 10px 10px 0 0; }}
+.stTabs [role="tab"], .stTabs [role="tab"] p {{ color: #d0d0d0 !important; font-weight: 500; font-size: .92rem; }}
+.stTabs [role="tab"]:hover {{ background: {C['raised']}; }}
+.stTabs [role="tab"][aria-selected="true"] {{ background: {C['surface']}; }}
+.stTabs [role="tab"][aria-selected="true"], .stTabs [role="tab"][aria-selected="true"] p {{ color: #ffffff !important; font-weight: 600; }}
+.stTabs [role="tab"] span[role="img"] {{ color: {C['accent']} !important; font-size: 1.3rem; margin-right: 4px;
+    vertical-align: -4px !important; }}
+.stTabs .react-aria-SelectionIndicator, .stTabs [data-baseweb="tab-highlight"] {{ background-color: {C['accent']} !important; }}
 
 /* Buttons */
 .stButton button, [data-testid="stDownloadButton"] button {{
@@ -507,9 +511,6 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 .rtable, .rtable tr, .rtable td, .rtable th {{ border-left: none !important; border-right: none !important;
     border-top: none !important; background: transparent !important; }}
 .rtable thead th, .rtable th {{ position: sticky; top: 0; background: {C['surface']} !important; }}
-.stTabs [data-baseweb="tab"], .stTabs [data-baseweb="tab"] p {{ color: #c4c4c4 !important; }}
-.stTabs [aria-selected="true"], .stTabs [aria-selected="true"] p {{ color: {C['ink']} !important; }}
-.stTabs [data-baseweb="tab-highlight"] {{ background-color: {C['accent']} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -795,8 +796,13 @@ k4.markdown(tile("วันที่ hazard สูงสุด", f"Day {peak_day
 st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 # ─── Tabs ────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📡 เรดอน", "🌏 แผ่นดินไหว", "🚨 พยากรณ์ความเสี่ยง",
-                                        "📈 สถิติ Precursor", "✅ ตรวจสอบย้อนหลัง"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    ":material/sensors: เรดอน",
+    ":material/public: แผ่นดินไหว",
+    ":material/crisis_alert: พยากรณ์ความเสี่ยง",
+    ":material/query_stats: สถิติ Precursor",
+    ":material/fact_check: ตรวจสอบย้อนหลัง",
+])
 
 # ══ TAB 1 — Radon ══════════════════════════════════════════════════════════
 with tab1:
