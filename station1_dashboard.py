@@ -8,7 +8,7 @@ Real-time — Google Sheets (Radon_001: RADON_A เรดอนในดิน /
 - รวมข้อมูลเป็นค่ามัธยฐานรายชั่วโมงก่อนวิเคราะห์ (เซนเซอร์ค้างค่าเดิมหลายรอบ 5 นาที)
 - เพิ่มกราฟเปรียบเทียบเรดอนในดิน vs ในอากาศ
 
-UI (27/11/2026): ธีมมืดแบบห้องควบคุม แบ่ง 5 แท็บ มีแถบสถานะ "ความเสี่ยงวันนี้" ด้านบน
+UI (27/11/2026): ธีมสว่างโทนนุ่มสบายตา แบ่ง 5 แท็บ มีแถบสถานะ "ความเสี่ยงวันนี้" ด้านบน
 เลิกใช้กราฟสองแกน (dual axis) — แยกเป็นกราฟซ้อนที่ใช้แกนเวลาเดียวกันแทน
 - พิกัดสถานีอ่านจากคอลัมน์ location ในชีตอัตโนมัติ
 """
@@ -389,42 +389,45 @@ def fmt_age(h):
     return f"{h / 24:.1f} วัน"
 
 
-# ─── Theme: Dark Control Room ─────────────────────────────────────────────────
+# ─── Theme: Soft Light (สบายตา) ─────────────────────────────────────────────────
 # ทุกสีอยู่ที่นี่ที่เดียว (แก้ธีมได้จากตรงนี้)
 C = {
-    "page":    "#0b0b0b",   # พื้นหลังหน้า
-    "panel":   "#141414",   # sidebar
-    "surface": "#191919",   # การ์ด/พื้นกราฟ
-    "raised":  "#222222",
-    "border":  "rgba(255,255,255,0.10)",
-    "ink":     "#efefef",   # ตัวอักษรหลัก
-    "ink2":    "#9c9c9c",   # ตัวอักษรรอง / แกน / legend
-    "grid":    "#303030",
-    "axis":    "#474747",
-    "accent":  "#338ced",
-    # status (ใช้เฉพาะระดับความเสี่ยง/สถานะ ไม่ใช้เป็นสีเส้นข้อมูล)
-    "good":    "#0aac23",
-    "warning": "#fbb315",
-    "serious": "#f18a59",
-    "critical": "#dc3c3d",
+    "page":    "#f4f6f8",   # พื้นหลังหน้า (เทาอมฟ้าอ่อน ไม่ขาวจ้า)
+    "panel":   "#eaeef2",   # sidebar
+    "surface": "#ffffff",   # การ์ด/พื้นกราฟ
+    "raised":  "#f0f3f6",
+    "border":  "#dde3ea",
+    "ink":     "#1f2933",   # ตัวอักษรหลัก (contrast ~14:1)
+    "ink2":    "#52606d",   # ตัวอักษรรอง (contrast ~6.5:1)
+    "grid":    "#e9edf1",
+    "axis":    "#c3ccd5",
+    "accent":  "#1f6fd1",
+    # status (ใช้เฉพาะระดับความเสี่ยง/สถานะ)
+    "good":    "#1e8e3e",
+    "warning": "#c98a00",
+    "serious": "#e0662a",
+    "critical": "#d03b3b",
     # สีของ "สิ่งที่วัด" (คงที่ตลอดทั้งหน้า)
-    "soil":    "#e76624",   # RADON_A
-    "air":     "#338ced",   # RADON_B
-    "eq":      "#9887ef",   # แผ่นดินไหว
-    "upper":   "#d28e05",   # เส้นขอบบน IQR
+    "soil":    "#d9622b",   # RADON_A
+    "air":     "#1f6fd1",   # RADON_B
+    "eq":      "#6a4ce2",   # แผ่นดินไหว
+    "upper":   "#b07c00",   # เส้นขอบบน IQR
 }
+# พื้นอ่อนของการ์ดความเสี่ยง (อ่านง่ายกว่าพื้นสีเข้มเต็มการ์ด)
+RISK_TINT = {"LOW": "#e8f5ec", "MODERATE": "#fdf4dc", "HIGH": "#fdece3", "VERY HIGH": "#fbe6e6"}
+RISK_INK = {"LOW": "#14632b", "MODERATE": "#7a5300", "HIGH": "#9a3f12", "VERY HIGH": "#9b1c1c"}
 CHANNELS["RADON_A"]["color"] = C["soil"]
 CHANNELS["RADON_B"]["color"] = C["air"]
 
 RISK_COLOR = {"LOW": C["good"], "MODERATE": C["warning"], "HIGH": C["serious"], "VERY HIGH": C["critical"]}
 RISK_ICON = {"LOW": "●", "MODERATE": "▲", "HIGH": "▲▲", "VERY HIGH": "■"}
 RISK_TH = {"LOW": "ต่ำ", "MODERATE": "ปานกลาง", "HIGH": "สูง", "VERY HIGH": "สูงมาก"}
-MAG_COLOR = {3.0: "#9887ef", 4.0: "#e24d8b", 5.0: "#eb6263"}   # กลุ่มขนาดแผ่นดินไหว (categorical)
+MAG_COLOR = {3.0: "#6a4ce2", 4.0: "#c2407a", 5.0: "#d03b3b"}   # กลุ่มขนาดแผ่นดินไหว (categorical)
 
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-html, body, .stApp, [class*="css"] {{ font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }}
+html, body, .stApp, [class*="css"] {{ font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; font-size: 16px; }}
 .stApp {{ background: {C['page']}; color: {C['ink']}; }}
 .block-container {{ padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1500px; }}
 header[data-testid="stHeader"] {{ background: transparent; }}
@@ -436,16 +439,18 @@ header[data-testid="stHeader"] {{ background: transparent; }}
     color: {C['ink2']}; margin: 18px 0 6px; font-weight: 600; }}
 [data-testid="stSidebar"] input {{ background: {C['surface']} !important; color: {C['ink']} !important; }}
 
-/* Tabs (Streamlit รุ่นใหม่ใช้ data-testid="stTab", รุ่นเก่าใช้ data-baseweb="tab") */
-.stTabs [role="tablist"] {{ gap: 6px; border-bottom: 1px solid {C['border']}; }}
-.stTabs [role="tab"] {{ background: transparent; padding: 10px 16px; border-radius: 10px 10px 0 0; }}
-.stTabs [role="tab"], .stTabs [role="tab"] p {{ color: #d0d0d0 !important; font-weight: 500; font-size: .92rem; }}
-.stTabs [role="tab"]:hover {{ background: {C['raised']}; }}
-.stTabs [role="tab"][aria-selected="true"] {{ background: {C['surface']}; }}
+/* Tabs — ปุ่มมีสีพื้น (Streamlit รุ่นใหม่ใช้ role="tab") */
+.stTabs [role="tablist"] {{ gap: 8px; border-bottom: none; padding-bottom: 6px; flex-wrap: wrap; }}
+.stTabs [role="tab"] {{ background: #ffffff; border: 1px solid {C['border']}; padding: 9px 18px; border-radius: 10px; }}
+.stTabs [role="tab"], .stTabs [role="tab"] p {{ color: {C['ink']} !important; font-weight: 500; font-size: .92rem; }}
+.stTabs [role="tab"]:hover {{ background: #eef4fc; border-color: #9cc0ea; }}
+.stTabs [role="tab"][aria-selected="true"] {{ background: {C['accent']}; border-color: {C['accent']};
+    box-shadow: 0 2px 8px rgba(31,111,209,.25); }}
 .stTabs [role="tab"][aria-selected="true"], .stTabs [role="tab"][aria-selected="true"] p {{ color: #ffffff !important; font-weight: 600; }}
 .stTabs [role="tab"] span[role="img"] {{ color: {C['accent']} !important; font-size: 1.3rem; margin-right: 4px;
     vertical-align: -4px !important; }}
-.stTabs .react-aria-SelectionIndicator, .stTabs [data-baseweb="tab-highlight"] {{ background-color: {C['accent']} !important; }}
+.stTabs [role="tab"][aria-selected="true"] span[role="img"] {{ color: #ffffff !important; }}
+.stTabs .react-aria-SelectionIndicator, .stTabs [data-baseweb="tab-highlight"] {{ display: none !important; }}
 
 /* Buttons */
 .stButton button, [data-testid="stDownloadButton"] button {{
@@ -468,7 +473,7 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.25; }} }}
 .mono {{ font-family: 'JetBrains Mono', ui-monospace, monospace; }}
 
-.tile {{ background: {C['surface']}; border: 1px solid {C['border']}; border-radius: 14px; padding: 14px 16px; height: 100%; }}
+.tile {{ background: {C['surface']}; border: 1px solid {C['border']}; box-shadow: 0 1px 3px rgba(31,41,51,.06); border-radius: 14px; padding: 14px 16px; height: 100%; }}
 .tile .lab {{ font-size: .72rem; color: {C['ink2']}; letter-spacing: .04em; }}
 .tile .val {{ font-family: 'JetBrains Mono', monospace; font-size: 1.55rem; font-weight: 600; color: {C['ink']}; margin-top: 4px; line-height: 1.15; }}
 .tile .unit {{ font-size: .8rem; color: {C['ink2']}; font-weight: 400; margin-left: 4px; }}
@@ -504,8 +509,8 @@ header[data-testid="stHeader"] {{ background: transparent; }}
     background: {C['surface']} !important; color: {C['ink']} !important; border-color: {C['border']} !important; }}
 [data-testid="stExpander"] summary, [data-testid="stExpander"] p, [data-testid="stWidgetLabel"] p {{ color: {C['ink']}; }}
 .banner {{ border-radius: 12px; padding: 12px 16px; margin: 0 0 12px; font-size: .85rem; border: 1px solid; }}
-.banner.err {{ background: rgba(220,60,61,.12); border-color: rgba(220,60,61,.45); color: #f3b4b4; }}
-.banner.warn {{ background: rgba(251,179,21,.10); border-color: rgba(251,179,21,.40); color: #f6d58a; }}
+.banner.err {{ background: #fbe9e9; border-color: #efb4b4; color: #8a1f1f; }}
+.banner.warn {{ background: #fdf5e0; border-color: #ecd08a; color: #6b4a00; }}
 .banner b {{ color: {C['ink']}; }}
 /* ตาราง HTML: ลบเส้นขอบเริ่มต้นของ Streamlit */
 .rtable, .rtable tr, .rtable td, .rtable th {{ border-left: none !important; border-right: none !important;
@@ -542,8 +547,7 @@ def tile(label, value, unit="", sub="", accent=None):
 
 def badge(level):
     col = RISK_COLOR.get(level, C["ink2"])
-    ink = "#0b0b0b" if level == "MODERATE" else "#ffffff"
-    return f'<span class="badge" style="background:{col};color:{ink};">{RISK_ICON.get(level, "")} {level}</span>'
+    return f'<span class="badge" style="background:{RISK_TINT.get(level, C["raised"])};color:{RISK_INK.get(level, C["ink"])};border:1px solid {col};">{RISK_ICON.get(level, "")} {level}</span>'
 
 
 def panel(title, sub=""):
@@ -767,7 +771,7 @@ if eq_info["is_mock"]:
 
 # ─── Status strip ────────────────────────────────────────────────────────────
 rc = RISK_COLOR[today_level]
-hero_ink = "#0b0b0b" if today_level == "MODERATE" else "#ffffff"
+hero_ink = RISK_INK[today_level]
 last_val = float(radon.iloc[-1])
 med30 = float(radon_full.loc[radon.index[-1] - pd.Timedelta(days=30):].median())
 delta_pct = (last_val / med30 - 1) * 100 if med30 else 0.0
@@ -778,7 +782,7 @@ fmt_v = (lambda v: f"{v:,.0f}") if channel == "RADON_A" else (lambda v: f"{v:,.1
 
 h, k1, k2, k3, k4 = st.columns([1.35, 1, 1, 1, 1])
 h.markdown(f"""
-<div class="hero" style="background:{rc};color:{hero_ink};">
+<div class="hero" style="background:{RISK_TINT[today_level]};color:{hero_ink};border:1px solid {rc};border-left:6px solid {rc};">
   <div class="lab">ความเสี่ยงวันนี้ (M≥{_snap})</div>
   <div class="val">{RISK_ICON[today_level]} {today_level}</div>
   <div class="sub">ระดับ{RISK_TH[today_level]} · {today_sub}</div>
@@ -880,7 +884,7 @@ with tab2:
                      + "<br>" + em["distance_km"].round(0).astype(int).astype(str) + " km จากสถานี"
                      + (("<br>" + em[region_col].astype(str).str[:40]) if region_col else ""))
         fig_map = go.Figure()
-        for lab, lo, hi, col in [("M<3", 0, 3, "#5f5f5f"), ("3≤M<4", 3, 4, MAG_COLOR[3.0]),
+        for lab, lo, hi, col in [("M<3", 0, 3, "#9aa5b1"), ("3≤M<4", 3, 4, MAG_COLOR[3.0]),
                                  ("4≤M<5", 4, 5, MAG_COLOR[4.0]), ("M≥5", 5, 99, MAG_COLOR[5.0])]:
             sub = em[(em["Magnitude"] >= lo) & (em["Magnitude"] < hi)]
             if len(sub):
@@ -894,9 +898,9 @@ with tab2:
                                         marker=dict(size=16, color=C["accent"]),
                                         hovertemplate="สถานี ST001<extra></extra>"))
         zoom = 6.2 if radius_km <= 200 else 5.2 if radius_km <= 400 else 4.3 if radius_km <= 700 else 3.8
-        fig_map.update_layout(map=dict(style="carto-darkmatter", center=dict(lat=STATION[0], lon=STATION[1]), zoom=zoom),
+        fig_map.update_layout(map=dict(style="carto-positron", center=dict(lat=STATION[0], lon=STATION[1]), zoom=zoom),
                               paper_bgcolor=C["surface"], height=470, margin=dict(l=0, r=0, t=0, b=0),
-                              legend=dict(bgcolor="rgba(25,25,25,0.85)", font=dict(color=C["ink"]), x=0.01, y=0.99),
+                              legend=dict(bgcolor="rgba(255,255,255,0.9)", font=dict(color=C["ink"]), x=0.01, y=0.99),
                               hoverlabel=dict(bgcolor=C["raised"], font=dict(color=C["ink"])))
         show(fig_map)
     with cs:
@@ -940,7 +944,7 @@ with tab2:
            .reindex(rdly.index, fill_value=0)) if len(eq_big) else pd.Series(0, index=rdly.index)
     lags = list(range(31))
     corrs = [0.0 if pd.isna(c := aflag.corr(eqd.shift(-lag))) else float(c) for lag in lags]
-    fig_lag = go.Figure(go.Bar(x=lags, y=corrs, marker=dict(color=[C["accent"] if c >= 0 else "#5f5f5f" for c in corrs],
+    fig_lag = go.Figure(go.Bar(x=lags, y=corrs, marker=dict(color=[C["accent"] if c >= 0 else "#9aa5b1" for c in corrs],
                                                            cornerradius=4),
                                hovertemplate="lag %{x} วัน · r = %{y:.3f}<extra></extra>"))
     dark_layout(fig_lag, height=240, hover="closest")
@@ -1161,9 +1165,9 @@ with tab5:
                                                                values="Accuracy (%)")
             fig8 = go.Figure(go.Heatmap(z=heat.values, x=[f"{int(c)} km" for c in heat.columns],
                                         y=[f"M≥{r}" for r in heat.index], xgap=2, ygap=2,
-                                        colorscale=[[0, "#0d2a4d"], [0.5, "#1f6fc6"], [1, "#9ccbff"]],
+                                        colorscale=[[0, "#eef4fc"], [0.5, "#7fb0e8"], [1, "#1557a8"]],
                                         text=heat.values.round(1), texttemplate="%{text}%",
-                                        textfont=dict(color=C["page"]), colorbar=dict(title="Hit %")))
+                                        textfont=dict(color=C["ink"]), colorbar=dict(title="Hit %")))
             dark_layout(fig8, f"Hit rate (%) — Window = {bw} วัน", height=340, hover="closest")
             show(fig8)
             html_table(gdf, max_rows=20, height=340)
